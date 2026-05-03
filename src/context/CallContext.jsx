@@ -181,6 +181,7 @@ useEffect(() => {
     };
 
     const endCall = (emit = true) => {
+        console.trace("endCall called, emit:", emit);
         if (emit) {
             const targetSocketId = callState.callerSocketId || callState.receiverSocketId;
             socket.emit("call:ended", { toSocketId: targetSocketId });
