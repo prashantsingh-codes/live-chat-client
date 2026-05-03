@@ -8,19 +8,24 @@ const iceServers = {
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
         {
-            urls: "turn:openrelay.metered.ca:80",
-            username: "openrelayproject",
-            credential: "openrelayproject",
+            urls: "turn:livechat.metered.live:80",
+            username: "6f0da3829a330d35398d8232",
+            credential: "X4AekrIXhIHpck5G",
         },
         {
-            urls: "turn:openrelay.metered.ca:443",
-            username: "openrelayproject",
-            credential: "openrelayproject",
+            urls: "turn:livechat.metered.live:443",
+            username: "6f0da3829a330d35398d8232",
+            credential: "X4AekrIXhIHpck5G",
         },
         {
-            urls: "turn:openrelay.metered.ca:443?transport=tcp",
-            username: "openrelayproject",
-            credential: "openrelayproject",
+            urls: "turns:livechat.metered.live:443",
+            username: "6f0da3829a330d35398d8232",
+            credential: "X4AekrIXhIHpck5G",
+        },
+        {
+            urls: "turn:livechat.metered.live:80?transport=tcp",
+            username: "6f0da3829a330d35398d8232",
+            credential: "X4AekrIXhIHpck5G",
         },
     ]
 };
