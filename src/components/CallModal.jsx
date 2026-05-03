@@ -24,18 +24,24 @@ const CallModal = () => {
         return (
             <div style={styles.overlay}>
                 <div style={styles.incomingCard}>
-                    <div style={styles.avatar}>
+                    <div style={styles.avatarLarge}>
                         {callState.callerName?.[0]?.toUpperCase()}
                     </div>
-                    <p style={{ fontSize: "1.2rem", fontWeight: 600, color: "#fff" }}>
+                    <p style={{ fontSize: "1.3rem", fontWeight: 700, color: "#fff", marginTop: 8 }}>
                         {callState.callerName}
                     </p>
-                    <p style={{ color: "#aaa", marginBottom: 24 }}>
+                    <p style={{ color: "#aaa", marginBottom: 32, fontSize: "0.9rem" }}>
                         Incoming {callState.callType} call...
                     </p>
-                    <div style={{ display: "flex", gap: 16 }}>
-                        <button onClick={rejectCall} style={styles.rejectBtn}>✕ Decline</button>
-                        <button onClick={acceptCall} style={styles.acceptBtn}>✓ Accept</button>
+                    <div style={{ display: "flex", gap: 40 }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                            <button onClick={rejectCall} style={styles.rejectCircle}>✕</button>
+                            <span style={{ color: "#aaa", fontSize: "0.75rem" }}>Decline</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                            <button onClick={acceptCall} style={styles.acceptCircle}>✓</button>
+                            <span style={{ color: "#aaa", fontSize: "0.75rem" }}>Accept</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -66,7 +72,6 @@ const CallModal = () => {
                 chatId: callState.chatId,
             });
         } catch (e) { console.log(e); }
-
         setCallMessages((prev) => [...prev, {
             sender: userData.name,
             content: msgInput,
@@ -77,157 +82,298 @@ const CallModal = () => {
 
     return (
         <div style={styles.overlay}>
-            <div style={{
-                ...styles.meetContainer,
-                gridTemplateColumns: showChat ? "1fr 320px" : "1fr"
-            }}>
-                {/* ── Video / Audio Area ── */}
-                <div style={styles.videoArea}>
-                    {callState.callType === "video" ? (
-                        <video ref={remoteVideoRef} autoPlay playsInline style={styles.remoteVideo} />
-                    ) : (
-                        <>
-                            {/* ref callback ensures srcObject is set even if stream arrived before mount */}
-                            <audio
-                                ref={(node) => {
-                                    remoteVideoRef.current = node;
-                                    if (node && node.srcObject) node.play().catch(() => {});
-                                }}
-                                autoPlay
-                                playsInline
-                            />
-                            <div style={styles.voiceScreen}>
-                                <div style={styles.avatarLarge}>
-                                    {callState.callerName?.[0]?.toUpperCase()}
-                                </div>
-                                <p style={{ color: "#fff", fontSize: "1.4rem", fontWeight: 600 }}>
-                                    {callState.callerName}
-                                </p>
-                                <p style={{ color: "#aaa" }}>Voice call in progress...</p>
+            {/* ── Full screen video/voice area ── */}
+            <div style={styles.fullScreen}>
+
+                {/* Remote video or voice avatar */}
+                {callState.callType === "video" ? (
+                    <video ref={remoteVideoRef} autoPlay playsInline style={styles.remoteVideo} />
+                ) : (
+                    <>
+                        <audio
+                            ref={(node) => {
+                                remoteVideoRef.current = node;
+                                if (node && node.srcObject) node.play().catch(() => {});
+                            }}
+                            autoPlay playsInline
+                        />
+                        <div style={styles.voiceBg}>
+                            <div style={styles.voiceAvatar}>
+                                {callState.callerName?.[0]?.toUpperCase()}
                             </div>
-                        </>
-                    )}
-
-                    {callState.callType === "video" && (
-                        <video ref={localVideoRef} autoPlay playsInline muted style={styles.localVideo} />
-                    )}
-
-                    <p style={styles.remoteName}>{callState.callerName}</p>
-
-                    {/* ── Controls ── */}
-                    <div style={styles.controls}>
-                        <CtrlBtn icon={muted ? "🔇" : "🎤"} label={muted ? "Unmute" : "Mute"} onClick={toggleMute} />
-                        {callState.callType === "video" && (
-                            <>
-                                <CtrlBtn icon={camOff ? "📷" : "📸"} label={camOff ? "Cam On" : "Cam Off"} onClick={toggleCam} />
-                                <CtrlBtn
-                                    icon="🖥️"
-                                    label={screenSharing ? "Stop Share" : "Share Screen"}
-                                    onClick={toggleScreenShare}
-                                    active={screenSharing}
-                                />
-                            </>
-                        )}
-                        <CtrlBtn icon="💬" label="Chat" onClick={() => setShowChat((s) => !s)} active={showChat} />
-                        <button onClick={() => endCall(true)} style={styles.endBtn}>📵 End</button>
-                    </div>
-                </div>
-
-                {/* ── In-call Chat Panel ── */}
-                {showChat && (
-                    <div style={styles.chatPanel}>
-                        <div style={styles.chatHeader}>
-                            <span style={{ fontWeight: 600, color: "#fff" }}>In-call messages</span>
-                            <button onClick={() => setShowChat(false)} style={styles.closeBtn}>✕</button>
+                            <p style={styles.voiceName}>{callState.callerName}</p>
+                            <p style={styles.voiceStatus}>Voice call in progress...</p>
                         </div>
-                        <p style={styles.chatNote}>Messages are saved to your chat.</p>
-                        <div style={styles.chatMessages}>
-                            {callMessages.map((m, i) => (
-                                <div key={i} style={styles.chatMsg}>
-                                    <span style={{ fontWeight: 600, fontSize: "0.8rem", color: "#a78bfa" }}>
-                                        {m.sender}
-                                    </span>
-                                    <p style={{ margin: "2px 0 0", fontSize: "0.9rem", color: "#fff" }}>
-                                        {m.content}
-                                    </p>
-                                    <span style={{ fontSize: "0.7rem", color: "#888" }}>{m.time}</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div style={styles.chatInput}>
-                            <input
-                                value={msgInput}
-                                onChange={(e) => setMsgInput(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && sendCallMessage()}
-                                placeholder="Send a message"
-                                style={styles.chatInputBox}
-                            />
-                            <button onClick={sendCallMessage} style={styles.sendBtn}>➤</button>
-                        </div>
+                    </>
+                )}
+
+                {/* Caller name tag (video calls) */}
+                {callState.callType === "video" && (
+                    <div style={styles.callerTag}>
+                        <div style={styles.callerTagDot} />
+                        {callState.callerName}
                     </div>
                 )}
+
+                {/* Local PiP video */}
+                {callState.callType === "video" && (
+                    <div style={styles.pipWrapper}>
+                        <video ref={localVideoRef} autoPlay playsInline muted style={styles.pipVideo} />
+                    </div>
+                )}
+
+                {/* Controls bar */}
+                <div style={styles.controlsBar}>
+                    <RoundBtn
+                        icon={muted ? "🔇" : "🎤"}
+                        active={muted}
+                        onClick={toggleMute}
+                    />
+                    {callState.callType === "video" && (
+                        <>
+                            <RoundBtn
+                                icon={camOff ? "📷" : "📸"}
+                                active={camOff}
+                                onClick={toggleCam}
+                            />
+                            <RoundBtn
+                                icon="🖥️"
+                                active={screenSharing}
+                                onClick={toggleScreenShare}
+                            />
+                        </>
+                    )}
+                    <RoundBtn
+                        icon="💬"
+                        active={showChat}
+                        onClick={() => setShowChat((s) => !s)}
+                    />
+                    <button onClick={() => endCall(true)} style={styles.endCircle}>
+                        📵
+                    </button>
+                </div>
             </div>
+
+            {/* ── In-call Chat Panel (slides up) ── */}
+            {showChat && (
+                <div style={styles.chatSheet}>
+                    <div style={styles.chatSheetHandle} />
+                    <div style={styles.chatSheetHeader}>
+                        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>
+                            In-call messages
+                        </span>
+                        <button onClick={() => setShowChat(false)} style={styles.closeBtn}>✕</button>
+                    </div>
+                    <p style={styles.chatNote}>Messages are saved to your chat.</p>
+                    <div style={styles.chatMessages}>
+                        {callMessages.map((m, i) => (
+                            <div key={i} style={styles.chatMsg}>
+                                <span style={{ fontWeight: 600, fontSize: "0.78rem", color: "#a78bfa" }}>
+                                    {m.sender}
+                                </span>
+                                <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#fff" }}>
+                                    {m.content}
+                                </p>
+                                <span style={{ fontSize: "0.68rem", color: "#888" }}>{m.time}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div style={styles.chatInput}>
+                        <input
+                            value={msgInput}
+                            onChange={(e) => setMsgInput(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && sendCallMessage()}
+                            placeholder="Send a message"
+                            style={styles.chatInputBox}
+                        />
+                        <button onClick={sendCallMessage} style={styles.sendBtn}>➤</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-const CtrlBtn = ({ icon, label, onClick, active }) => (
+const RoundBtn = ({ icon, onClick, active }) => (
     <button onClick={onClick} style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        gap: 4, padding: "10px 14px", borderRadius: 10, border: "none",
-        color: "#fff", cursor: "pointer", minWidth: 60,
-        background: active ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.1)",
+        width: 52,
+        height: 52,
+        borderRadius: "50%",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "1.3rem",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: active ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.15)",
+        backdropFilter: "blur(8px)",
+        transition: "background 0.2s",
     }}>
-        <span style={{ fontSize: "1.2rem" }}>{icon}</span>
-        <span style={{ fontSize: "0.7rem" }}>{label}</span>
+        {icon}
     </button>
 );
 
 const styles = {
-    overlay: { position: "fixed", inset: 0, background: "#000", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" },
-meetContainer: { 
-    display: "grid", 
-    width: "100%", 
-    height: "100vh",
-    overflow: "hidden",
-    position: "relative",
-},
-videoArea: { 
-    position: "relative", 
-    background: "#111", 
-    display: "flex", 
-    alignItems: "center", 
-    justifyContent: "center",
-    width: "100%",
-    height: "100vh",
-    overflow: "hidden",
-},
-remoteVideo: { 
-    position: "absolute",
-    inset: 0,
-    width: "100%", 
-    height: "100%", 
-    objectFit: "cover" 
-},
-    localVideo: { position: "absolute", bottom: 90, right: 16, width: 180, height: 120, borderRadius: 12, objectFit: "cover", border: "2px solid #444" },
-    voiceScreen: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 },
-    remoteName: { position: "absolute", bottom: 90, left: 16, color: "#fff", fontSize: "0.9rem", background: "rgba(0,0,0,0.4)", padding: "4px 10px", borderRadius: 6 },
-    controls: { position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: 16, background: "rgba(0,0,0,0.5)" },
-    endBtn: { background: "#e53935", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", cursor: "pointer", fontWeight: 600 },
-    incomingCard: { background: "#1e1e2e", borderRadius: 16, padding: 40, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 },
-    avatar: { width: 72, height: 72, borderRadius: "50%", background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem", color: "#fff", marginBottom: 8 },
-    avatarLarge: { width: 100, height: 100, borderRadius: "50%", background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", color: "#fff" },
-    acceptBtn: { background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", cursor: "pointer", fontWeight: 600, fontSize: "1rem" },
-    rejectBtn: { background: "#e53935", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", cursor: "pointer", fontWeight: 600, fontSize: "1rem" },
-    chatPanel: { background: "#1e1e2e", display: "flex", flexDirection: "column" },
-    chatHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottom: "1px solid #333" },
-    chatNote: { fontSize: "0.75rem", color: "#888", padding: "8px 16px" },
-    chatMessages: { flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 },
-    chatMsg: { background: "#2a2a3e", borderRadius: 8, padding: "8px 12px" },
-    chatInput: { display: "flex", gap: 8, padding: 12, borderTop: "1px solid #333" },
-    chatInputBox: { flex: 1, background: "#2a2a3e", border: "none", borderRadius: 8, padding: "10px 14px", color: "#fff", outline: "none" },
-    sendBtn: { background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "10px 14px", cursor: "pointer" },
-    closeBtn: { background: "transparent", border: "none", color: "#aaa", cursor: "pointer", fontSize: "1rem" },
+    // ── Base ──
+    overlay: {
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "#000",
+        display: "flex", flexDirection: "column",
+    },
+    fullScreen: {
+        position: "relative",
+        flex: 1,
+        overflow: "hidden",
+        background: "#111",
+    },
+
+    // ── Remote video ──
+    remoteVideo: {
+        position: "absolute", inset: 0,
+        width: "100%", height: "100%",
+        objectFit: "cover",
+    },
+
+    // ── Voice call bg ──
+    voiceBg: {
+        position: "absolute", inset: 0,
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        gap: 16,
+        background: "linear-gradient(160deg, #1a1d27 0%, #2d3557 100%)",
+    },
+    voiceAvatar: {
+        width: 100, height: 100, borderRadius: "50%",
+        background: "#4f46e5",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "2.5rem", color: "#fff", fontWeight: 700,
+    },
+    voiceName: {
+        color: "#fff", fontSize: "1.4rem", fontWeight: 700, margin: 0,
+    },
+    voiceStatus: {
+        color: "#aaa", fontSize: "0.9rem", margin: 0,
+    },
+
+    // ── Caller name tag ──
+    callerTag: {
+        position: "absolute", top: 16, left: 16,
+        display: "flex", alignItems: "center", gap: 8,
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(8px)",
+        color: "#fff", fontSize: "0.85rem", fontWeight: 600,
+        padding: "6px 14px", borderRadius: 20,
+    },
+    callerTagDot: {
+        width: 8, height: 8, borderRadius: "50%",
+        background: "#22c55e",
+    },
+
+    // ── PiP local video ──
+    pipWrapper: {
+        position: "absolute",
+        bottom: 100, right: 16,
+        width: 110, height: 160,
+        borderRadius: 16,
+        overflow: "hidden",
+        border: "2px solid rgba(255,255,255,0.3)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+    },
+    pipVideo: {
+        width: "100%", height: "100%", objectFit: "cover",
+    },
+
+    // ── Controls bar ──
+    controlsBar: {
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: 16,
+        padding: "16px 20px 32px",
+        background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
+    },
+    endCircle: {
+        width: 56, height: 56, borderRadius: "50%",
+        background: "#e53935", border: "none",
+        fontSize: "1.4rem", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+    },
+
+    // ── Incoming call ──
+    incomingCard: {
+        flex: 1,
+        background: "linear-gradient(160deg, #1a1d27 0%, #2d3557 100%)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        gap: 8,
+    },
+    avatarLarge: {
+        width: 100, height: 100, borderRadius: "50%",
+        background: "#4f46e5",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "2.5rem", color: "#fff", fontWeight: 700,
+    },
+    acceptCircle: {
+        width: 64, height: 64, borderRadius: "50%",
+        background: "#22c55e", color: "#fff",
+        border: "none", fontSize: "1.5rem",
+        cursor: "pointer", display: "flex",
+        alignItems: "center", justifyContent: "center",
+    },
+    rejectCircle: {
+        width: 64, height: 64, borderRadius: "50%",
+        background: "#e53935", color: "#fff",
+        border: "none", fontSize: "1.5rem",
+        cursor: "pointer", display: "flex",
+        alignItems: "center", justifyContent: "center",
+    },
+
+    // ── Chat sheet ──
+    chatSheet: {
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        height: "55%",
+        background: "#1e1e2e",
+        borderRadius: "20px 20px 0 0",
+        display: "flex", flexDirection: "column",
+        boxShadow: "0 -4px 30px rgba(0,0,0,0.5)",
+    },
+    chatSheetHandle: {
+        width: 40, height: 4, borderRadius: 2,
+        background: "#444", margin: "12px auto 4px",
+    },
+    chatSheetHeader: {
+        display: "flex", justifyContent: "space-between",
+        alignItems: "center", padding: "8px 16px 8px",
+        borderBottom: "1px solid #333",
+    },
+    chatNote: {
+        fontSize: "0.72rem", color: "#888", padding: "6px 16px",
+    },
+    chatMessages: {
+        flex: 1, overflowY: "auto", padding: 16,
+        display: "flex", flexDirection: "column", gap: 10,
+    },
+    chatMsg: {
+        background: "#2a2a3e", borderRadius: 10, padding: "8px 12px",
+    },
+    chatInput: {
+        display: "flex", gap: 8, padding: 12,
+        borderTop: "1px solid #333",
+    },
+    chatInputBox: {
+        flex: 1, background: "#2a2a3e", border: "none",
+        borderRadius: 20, padding: "10px 14px",
+        color: "#fff", outline: "none", fontSize: "0.9rem",
+    },
+    sendBtn: {
+        background: "#4f46e5", color: "#fff", border: "none",
+        borderRadius: "50%", width: 40, height: 40,
+        cursor: "pointer", fontSize: "0.9rem",
+        display: "flex", alignItems: "center", justifyContent: "center",
+    },
+    closeBtn: {
+        background: "transparent", border: "none",
+        color: "#aaa", cursor: "pointer", fontSize: "1rem",
+    },
 };
 
 export default CallModal;
