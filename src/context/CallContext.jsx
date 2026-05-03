@@ -89,11 +89,14 @@ const CallContextProvider = ({ children, socket }) => {
     }, [socket]);
 
     // Assign remote stream to ref whenever stream arrives or ref mounts
-    useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-        }
-    }, [remoteStream, callState.accepted]);
+useEffect(() => {
+    console.log("remoteStream:", remoteStream);
+    console.log("remoteVideoRef.current:", remoteVideoRef.current);
+    if (remoteVideoRef.current && remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        console.log("srcObject assigned");
+    }
+}, [remoteStream, callState.accepted]);
 
     const startCall = async (receiverSocketId, receiverName, callType, chatId) => {
         try {
