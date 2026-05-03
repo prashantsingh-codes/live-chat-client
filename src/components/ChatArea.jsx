@@ -69,11 +69,13 @@ const ChatArea = () => {
 
   // ── Get receiver socket ID when otherUserId is known ──
   useEffect(() => {
-    if (!socket || !otherUserId) return;
-    socket.emit("get-socket-id", otherUserId, (socketId) => {
+    if (!otherUserId) return;
+    console.log("Looking up socket for:", otherUserId);
+    globalSocket.emit("get-socket-id", otherUserId, (socketId) => {
+      console.log("Got socketId:", socketId);
       setReceiverSocketId(socketId);
     });
-  }, [otherUserId, socketConnected]);
+  }, [otherUserId]);
 
   // ── Leave group ──
   const leaveGroup = async () => {
