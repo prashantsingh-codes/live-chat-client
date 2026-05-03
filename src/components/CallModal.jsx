@@ -1,13 +1,16 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, useRef } from "react";
 import { CallContext } from "../context/CallContext.jsx";
 import { ChatContext } from "../context/ChatContext.jsx";
 import axios from "axios";
+
+// Detect mobile browser
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 const CallModal = () => {
     const {
         callState, localStream, localVideoRef, remoteVideoRef,
         acceptCall, rejectCall, endCall,
-        toggleScreenShare, screenSharing,
+        toggleScreenShare, toggleCamTrack, screenSharing,
         callMessages, setCallMessages,
     } = useContext(CallContext);
 
@@ -17,16 +20,19 @@ const CallModal = () => {
     const [muted, setMuted] = useState(false);
     const [camOff, setCamOff] = useState(false);
 
-    // Fix: keep localVideoRef.srcObject in sync with localStream
+    // Separate ref for PiP so it's never confused with screen share preview
+    const pipRef = useRef(null);
+
+    // Sync PiP video with localStream
     useEffect(() => {
-        if (localVideoRef.current && localStream) {
-            localVideoRef.current.srcObject = localStream;
+        if (pipRef.current && localStream) {
+            pipRef.current.srcObject = localStream;
         }
-    }, [localStream, callState.accepted]);
+    }, [localStream, callState.accepted, screenSharing]);
 
     if (!callState.active) return null;
 
-    // ── Incoming call screen ──
+    // ── Incoming ──
     if (callState.incoming && !callState.accepted) {
         return (
             <div style={styles.overlay}>
@@ -62,10 +68,10 @@ const CallModal = () => {
         setMuted((m) => !m);
     };
 
-    // Fix: only disable video tracks, never stop them
     const toggleCam = () => {
-        localStream?.getVideoTracks().forEach((t) => (t.enabled = camOff));
-        setCamOff((c) => !c);
+        const next = camOff; // if camOff=true, we want to enable → next=true
+        toggleCamTrack(next);
+        setCamOff(!next);
     };
 
     const sendCallMessage = async () => {
@@ -84,19 +90,20 @@ const CallModal = () => {
         setMsgInput("");
     };
 
-    // When screen sharing, remote video should "contain" not "cover"
-    const remoteVideoStyle = {
-        ...styles.remoteVideo,
-        objectFit: screenSharing ? "contain" : "cover",
-    };
-
     return (
         <div style={styles.overlay}>
             <div style={styles.fullScreen}>
 
-                {/* Remote video or voice bg */}
+                {/* Remote video / voice */}
                 {callState.callType === "video" ? (
-                    <video ref={remoteVideoRef} autoPlay playsInline style={remoteVideoStyle} />
+                    <video
+                        ref={remoteVideoRef}
+                        autoPlay playsInline
+                        style={{
+                            ...styles.remoteVideo,
+                            objectFit: screenSharing ? "contain" : "cover",
+                        }}
+                    />
                 ) : (
                     <>
                         <audio
@@ -129,28 +136,35 @@ const CallModal = () => {
                     </div>
                 )}
 
-                {/* Local PiP — shown for video calls, hidden when cam is off */}
+                {/* PiP — uses separate pipRef, always shows localStream */}
                 {callState.callType === "video" && (
                     <div style={{
                         ...styles.pipWrapper,
-                        // When screen sharing, move pip to lower half area
                         bottom: screenSharing ? "calc(40% + 16px)" : 100,
                     }}>
                         {camOff ? (
                             <div style={styles.pipCamOff}>
-                                <span style={{ fontSize: "1.5rem" }}>📷</span>
-                                <span style={{ color: "#aaa", fontSize: "0.7rem" }}>Cam off</span>
+                                <span style={{ fontSize: "1.4rem" }}>📷</span>
+                                <span style={{ color: "#aaa", fontSize: "0.68rem" }}>Cam off</span>
                             </div>
                         ) : (
-                            <video ref={localVideoRef} autoPlay playsInline muted style={styles.pipVideo} />
+                            <video
+                                ref={pipRef}
+                                autoPlay playsInline muted
+                                style={styles.pipVideo}
+                            />
                         )}
                     </div>
                 )}
 
-                {/* Screen share: show your cam in lower half */}
+                {/* Screen share: local cam in lower strip */}
                 {screenSharing && callState.callType === "video" && (
                     <div style={styles.screenShareLocalArea}>
-                        <video ref={localVideoRef} autoPlay playsInline muted style={styles.screenShareLocalVideo} />
+                        <video
+                            ref={localVideoRef}
+                            autoPlay playsInline muted
+                            style={styles.screenShareLocalVideo}
+                        />
                         <span style={styles.youLabel}>You</span>
                     </div>
                 )}
@@ -161,7 +175,10 @@ const CallModal = () => {
                     {callState.callType === "video" && (
                         <>
                             <RoundBtn icon={camOff ? "📷" : "📸"} active={camOff} onClick={toggleCam} />
-                            <RoundBtn icon="🖥️" active={screenSharing} onClick={toggleScreenShare} />
+                            {/* Hide screen share on mobile — not supported */}
+                            {!isMobile && (
+                                <RoundBtn icon="🖥️" active={screenSharing} onClick={toggleScreenShare} />
+                            )}
                         </>
                     )}
                     <RoundBtn icon="💬" active={showChat} onClick={() => setShowChat((s) => !s)} />
@@ -174,15 +191,21 @@ const CallModal = () => {
                 <div style={styles.chatSheet}>
                     <div style={styles.chatSheetHandle} />
                     <div style={styles.chatSheetHeader}>
-                        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>In-call messages</span>
+                        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>
+                            In-call messages
+                        </span>
                         <button onClick={() => setShowChat(false)} style={styles.closeBtn}>✕</button>
                     </div>
                     <p style={styles.chatNote}>Messages are saved to your chat.</p>
                     <div style={styles.chatMessages}>
                         {callMessages.map((m, i) => (
                             <div key={i} style={styles.chatMsg}>
-                                <span style={{ fontWeight: 600, fontSize: "0.78rem", color: "#a78bfa" }}>{m.sender}</span>
-                                <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#fff" }}>{m.content}</p>
+                                <span style={{ fontWeight: 600, fontSize: "0.78rem", color: "#a78bfa" }}>
+                                    {m.sender}
+                                </span>
+                                <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#fff" }}>
+                                    {m.content}
+                                </p>
                                 <span style={{ fontSize: "0.68rem", color: "#888" }}>{m.time}</span>
                             </div>
                         ))}
@@ -229,7 +252,6 @@ const styles = {
     remoteVideo: {
         position: "absolute", inset: 0,
         width: "100%", height: "100%",
-        objectFit: "cover",
         background: "#000",
     },
     voiceBg: {
@@ -239,8 +261,7 @@ const styles = {
         background: "linear-gradient(160deg, #1a1d27 0%, #2d3557 100%)",
     },
     voiceAvatar: {
-        width: 100, height: 100, borderRadius: "50%",
-        background: "#4f46e5",
+        width: 100, height: 100, borderRadius: "50%", background: "#4f46e5",
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: "2.5rem", color: "#fff", fontWeight: 700,
     },
@@ -256,8 +277,6 @@ const styles = {
     callerTagDot: {
         width: 8, height: 8, borderRadius: "50%", background: "#22c55e",
     },
-
-    // PiP
     pipWrapper: {
         position: "absolute", right: 16,
         width: 110, height: 160,
@@ -265,28 +284,22 @@ const styles = {
         border: "2px solid rgba(255,255,255,0.3)",
         boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
         transition: "bottom 0.3s ease",
+        zIndex: 10,
     },
     pipVideo: { width: "100%", height: "100%", objectFit: "cover" },
     pipCamOff: {
-        width: "100%", height: "100%",
-        background: "#1e1e2e",
+        width: "100%", height: "100%", background: "#1e1e2e",
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center", gap: 6,
     },
-
-    // Screen share lower half local cam
     screenShareLocalArea: {
-        position: "absolute",
-        bottom: 90, left: 0, right: 0,
-        height: "35%",
-        background: "#000",
+        position: "absolute", bottom: 90, left: 0, right: 0,
+        height: "35%", background: "#000",
         display: "flex", alignItems: "center", justifyContent: "center",
     },
     screenShareLocalVideo: {
-        height: "100%",
-        maxWidth: "60%",
-        objectFit: "cover",
-        borderRadius: 12,
+        height: "100%", maxWidth: "60%",
+        objectFit: "cover", borderRadius: 12,
     },
     youLabel: {
         position: "absolute", bottom: 8, left: "50%",
@@ -295,8 +308,6 @@ const styles = {
         background: "rgba(0,0,0,0.5)",
         padding: "2px 10px", borderRadius: 10,
     },
-
-    // Controls
     controlsBar: {
         position: "absolute", bottom: 0, left: 0, right: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -309,8 +320,6 @@ const styles = {
         fontSize: "1.4rem", cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
     },
-
-    // Incoming
     incomingCard: {
         flex: 1,
         background: "linear-gradient(160deg, #1a1d27 0%, #2d3557 100%)",
@@ -334,8 +343,6 @@ const styles = {
         fontSize: "1.5rem", cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
     },
-
-    // Chat sheet
     chatSheet: {
         position: "absolute", bottom: 0, left: 0, right: 0,
         height: "55%", background: "#1e1e2e",

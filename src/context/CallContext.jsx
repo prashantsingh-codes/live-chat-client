@@ -59,6 +59,26 @@ const CallContextProvider = ({ children, socket }) => {
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const screenTrackRef = useRef(null);
+    const localStreamRef = useRef(null); // always up-to-date stream ref
+
+    // Keep localStreamRef in sync
+    useEffect(() => {
+        localStreamRef.current = localStream;
+    }, [localStream]);
+
+    // Assign remote stream to ref after render
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream, callState.accepted]);
+
+    // Assign local stream to localVideoRef after render
+    useEffect(() => {
+        if (localVideoRef.current && localStream) {
+            localVideoRef.current.srcObject = localStream;
+        }
+    }, [localStream, callState.accepted]);
 
     useEffect(() => {
         if (!socket) return;
@@ -88,16 +108,6 @@ const CallContextProvider = ({ children, socket }) => {
         };
     }, [socket]);
 
-    // Assign remote stream to ref whenever stream arrives or ref mounts
-useEffect(() => {
-    console.log("remoteStream:", remoteStream);
-    console.log("remoteVideoRef.current:", remoteVideoRef.current);
-    if (remoteVideoRef.current && remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-        console.log("srcObject assigned");
-    }
-}, [remoteStream, callState.accepted]);
-
     const startCall = async (receiverSocketId, receiverName, callType, chatId) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -105,6 +115,7 @@ useEffect(() => {
                 audio: audioConstraints,
             });
             setLocalStream(stream);
+            localStreamRef.current = stream;
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
             const peer = new window.SimplePeer({
@@ -119,8 +130,7 @@ useEffect(() => {
                     toSocketId: receiverSocketId,
                     fromSocketId: socket.id,
                     from: userData._id,
-                    signal,
-                    callType,
+                    signal, callType,
                     callerName: userData.name,
                     chatId,
                 });
@@ -148,6 +158,7 @@ useEffect(() => {
                 audio: audioConstraints,
             });
             setLocalStream(stream);
+            localStreamRef.current = stream;
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
             const peer = new window.SimplePeer({
@@ -187,9 +198,11 @@ useEffect(() => {
             socket.emit("call:ended", { toSocketId: targetSocketId });
         }
         peerRef.current?.destroy();
-        localStream?.getTracks().forEach((t) => t.stop());
+        localStreamRef.current?.getTracks().forEach((t) => t.stop());
+        screenTrackRef.current?.stop();
         setLocalStream(null);
         setRemoteStream(null);
+        localStreamRef.current = null;
         setCallState({ active: false, incoming: false, accepted: false });
         setCallMessages([]);
         setScreenSharing(false);
@@ -201,25 +214,57 @@ useEffect(() => {
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const screenTrack = screenStream.getVideoTracks()[0];
                 screenTrackRef.current = screenTrack;
+
+                // Replace video track in peer
                 const sender = peerRef.current?._pc?.getSenders()
                     .find((s) => s.track?.kind === "video");
-                sender?.replaceTrack(screenTrack);
-                if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
-                screenTrack.onended = () => toggleScreenShare();
+                await sender?.replaceTrack(screenTrack);
+
+                // Show screen in local preview
+                if (localVideoRef.current) {
+                    // Merge screen video + original audio into one stream for preview
+                    const previewStream = new MediaStream([
+                        screenTrack,
+                        ...localStreamRef.current.getAudioTracks(),
+                    ]);
+                    localVideoRef.current.srcObject = previewStream;
+                }
+
+                screenTrack.onended = () => stopScreenShare();
                 setScreenSharing(true);
             } catch (err) {
                 console.log("Screen share error:", err);
             }
         } else {
-            const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const camTrack = camStream.getVideoTracks()[0];
-            const sender = peerRef.current?._pc?.getSenders()
-                .find((s) => s.track?.kind === "video");
-            sender?.replaceTrack(camTrack);
-            if (localVideoRef.current) localVideoRef.current.srcObject = camStream;
-            screenTrackRef.current?.stop();
-            setScreenSharing(false);
+            stopScreenShare();
         }
+    };
+
+    const stopScreenShare = async () => {
+        try {
+            const camTrack = localStreamRef.current?.getVideoTracks()[0];
+            if (camTrack) {
+                const sender = peerRef.current?._pc?.getSenders()
+                    .find((s) => s.track?.kind === "video");
+                await sender?.replaceTrack(camTrack);
+            }
+            // Restore camera preview
+            if (localVideoRef.current && localStreamRef.current) {
+                localVideoRef.current.srcObject = localStreamRef.current;
+            }
+            screenTrackRef.current?.stop();
+            screenTrackRef.current = null;
+            setScreenSharing(false);
+        } catch (err) {
+            console.log("Stop screen share error:", err);
+        }
+    };
+
+    // Expose toggleCam here so it uses localStreamRef (never stale)
+    const toggleCamTrack = (enable) => {
+        localStreamRef.current?.getVideoTracks().forEach((t) => {
+            t.enabled = enable;
+        });
     };
 
     return (
@@ -228,6 +273,7 @@ useEffect(() => {
             localVideoRef, remoteVideoRef,
             startCall, acceptCall, rejectCall, endCall,
             toggleScreenShare, screenSharing,
+            toggleCamTrack,
             callMessages, setCallMessages,
         }}>
             {children}
