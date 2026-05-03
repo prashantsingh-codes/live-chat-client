@@ -1,8 +1,29 @@
 import { createContext, useState, useRef, useContext, useEffect } from "react";
-// import SimplePeer from "simple-peer";
 import { ChatContext } from "./ChatContext.jsx";
 
 export const CallContext = createContext();
+
+const iceServers = {
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+    ]
+};
 
 const CallContextProvider = ({ children, socket }) => {
     const { userData } = useContext(ChatContext);
@@ -66,8 +87,10 @@ const CallContextProvider = ({ children, socket }) => {
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
             const peer = new window.SimplePeer({
-                initiator: true, trickle: false, stream,
-                config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
+                initiator: true,
+                trickle: false,
+                stream,
+                config: iceServers,
             });
 
             peer.on("signal", (signal) => {
@@ -110,8 +133,10 @@ const CallContextProvider = ({ children, socket }) => {
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
             const peer = new window.SimplePeer({
-                initiator: false, trickle: false, stream,
-                config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
+                initiator: false,
+                trickle: false,
+                stream,
+                config: iceServers,
             });
 
             peer.on("signal", (signal) => {
