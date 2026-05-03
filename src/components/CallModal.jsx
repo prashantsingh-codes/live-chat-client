@@ -1,11 +1,11 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { CallContext } from "../context/CallContext.jsx";
 import { ChatContext } from "../context/ChatContext.jsx";
 import axios from "axios";
 
 const CallModal = () => {
     const {
-        callState, localVideoRef, remoteVideoRef,
+        callState, localStream, localVideoRef, remoteVideoRef,
         acceptCall, rejectCall, endCall,
         toggleScreenShare, screenSharing,
         callMessages, setCallMessages,
@@ -16,6 +16,13 @@ const CallModal = () => {
     const [msgInput, setMsgInput] = useState("");
     const [muted, setMuted] = useState(false);
     const [camOff, setCamOff] = useState(false);
+
+    // Fix: keep localVideoRef.srcObject in sync with localStream
+    useEffect(() => {
+        if (localVideoRef.current && localStream) {
+            localVideoRef.current.srcObject = localStream;
+        }
+    }, [localStream, callState.accepted]);
 
     if (!callState.active) return null;
 
@@ -51,16 +58,13 @@ const CallModal = () => {
     if (!callState.accepted) return null;
 
     const toggleMute = () => {
-        localVideoRef.current?.srcObject
-            ?.getAudioTracks()
-            .forEach((t) => (t.enabled = !t.enabled));
+        localStream?.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
         setMuted((m) => !m);
     };
 
+    // Fix: only disable video tracks, never stop them
     const toggleCam = () => {
-        localVideoRef.current?.srcObject
-            ?.getVideoTracks()
-            .forEach((t) => (t.enabled = !t.enabled));
+        localStream?.getVideoTracks().forEach((t) => (t.enabled = camOff));
         setCamOff((c) => !c);
     };
 
@@ -80,14 +84,19 @@ const CallModal = () => {
         setMsgInput("");
     };
 
+    // When screen sharing, remote video should "contain" not "cover"
+    const remoteVideoStyle = {
+        ...styles.remoteVideo,
+        objectFit: screenSharing ? "contain" : "cover",
+    };
+
     return (
         <div style={styles.overlay}>
-            {/* ── Full screen video/voice area ── */}
             <div style={styles.fullScreen}>
 
-                {/* Remote video or voice avatar */}
+                {/* Remote video or voice bg */}
                 {callState.callType === "video" ? (
-                    <video ref={remoteVideoRef} autoPlay playsInline style={styles.remoteVideo} />
+                    <video ref={remoteVideoRef} autoPlay playsInline style={remoteVideoStyle} />
                 ) : (
                     <>
                         <audio
@@ -107,73 +116,73 @@ const CallModal = () => {
                     </>
                 )}
 
-                {/* Caller name tag (video calls) */}
+                {/* Caller name tag */}
                 {callState.callType === "video" && (
                     <div style={styles.callerTag}>
                         <div style={styles.callerTagDot} />
                         {callState.callerName}
+                        {screenSharing && (
+                            <span style={{ marginLeft: 6, fontSize: "0.75rem", color: "#a78bfa" }}>
+                                • presenting
+                            </span>
+                        )}
                     </div>
                 )}
 
-                {/* Local PiP video */}
+                {/* Local PiP — shown for video calls, hidden when cam is off */}
                 {callState.callType === "video" && (
-                    <div style={styles.pipWrapper}>
-                        <video ref={localVideoRef} autoPlay playsInline muted style={styles.pipVideo} />
+                    <div style={{
+                        ...styles.pipWrapper,
+                        // When screen sharing, move pip to lower half area
+                        bottom: screenSharing ? "calc(40% + 16px)" : 100,
+                    }}>
+                        {camOff ? (
+                            <div style={styles.pipCamOff}>
+                                <span style={{ fontSize: "1.5rem" }}>📷</span>
+                                <span style={{ color: "#aaa", fontSize: "0.7rem" }}>Cam off</span>
+                            </div>
+                        ) : (
+                            <video ref={localVideoRef} autoPlay playsInline muted style={styles.pipVideo} />
+                        )}
                     </div>
                 )}
 
-                {/* Controls bar */}
+                {/* Screen share: show your cam in lower half */}
+                {screenSharing && callState.callType === "video" && (
+                    <div style={styles.screenShareLocalArea}>
+                        <video ref={localVideoRef} autoPlay playsInline muted style={styles.screenShareLocalVideo} />
+                        <span style={styles.youLabel}>You</span>
+                    </div>
+                )}
+
+                {/* Controls */}
                 <div style={styles.controlsBar}>
-                    <RoundBtn
-                        icon={muted ? "🔇" : "🎤"}
-                        active={muted}
-                        onClick={toggleMute}
-                    />
+                    <RoundBtn icon={muted ? "🔇" : "🎤"} active={muted} onClick={toggleMute} />
                     {callState.callType === "video" && (
                         <>
-                            <RoundBtn
-                                icon={camOff ? "📷" : "📸"}
-                                active={camOff}
-                                onClick={toggleCam}
-                            />
-                            <RoundBtn
-                                icon="🖥️"
-                                active={screenSharing}
-                                onClick={toggleScreenShare}
-                            />
+                            <RoundBtn icon={camOff ? "📷" : "📸"} active={camOff} onClick={toggleCam} />
+                            <RoundBtn icon="🖥️" active={screenSharing} onClick={toggleScreenShare} />
                         </>
                     )}
-                    <RoundBtn
-                        icon="💬"
-                        active={showChat}
-                        onClick={() => setShowChat((s) => !s)}
-                    />
-                    <button onClick={() => endCall(true)} style={styles.endCircle}>
-                        📵
-                    </button>
+                    <RoundBtn icon="💬" active={showChat} onClick={() => setShowChat((s) => !s)} />
+                    <button onClick={() => endCall(true)} style={styles.endCircle}>📵</button>
                 </div>
             </div>
 
-            {/* ── In-call Chat Panel (slides up) ── */}
+            {/* Chat sheet */}
             {showChat && (
                 <div style={styles.chatSheet}>
                     <div style={styles.chatSheetHandle} />
                     <div style={styles.chatSheetHeader}>
-                        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>
-                            In-call messages
-                        </span>
+                        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>In-call messages</span>
                         <button onClick={() => setShowChat(false)} style={styles.closeBtn}>✕</button>
                     </div>
                     <p style={styles.chatNote}>Messages are saved to your chat.</p>
                     <div style={styles.chatMessages}>
                         {callMessages.map((m, i) => (
                             <div key={i} style={styles.chatMsg}>
-                                <span style={{ fontWeight: 600, fontSize: "0.78rem", color: "#a78bfa" }}>
-                                    {m.sender}
-                                </span>
-                                <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#fff" }}>
-                                    {m.content}
-                                </p>
+                                <span style={{ fontWeight: 600, fontSize: "0.78rem", color: "#a78bfa" }}>{m.sender}</span>
+                                <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#fff" }}>{m.content}</p>
                                 <span style={{ fontSize: "0.68rem", color: "#888" }}>{m.time}</span>
                             </div>
                         ))}
@@ -196,15 +205,9 @@ const CallModal = () => {
 
 const RoundBtn = ({ icon, onClick, active }) => (
     <button onClick={onClick} style={{
-        width: 52,
-        height: 52,
-        borderRadius: "50%",
-        border: "none",
-        cursor: "pointer",
-        fontSize: "1.3rem",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        width: 52, height: 52, borderRadius: "50%",
+        border: "none", cursor: "pointer", fontSize: "1.3rem",
+        display: "flex", alignItems: "center", justifyContent: "center",
         background: active ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.15)",
         backdropFilter: "blur(8px)",
         transition: "background 0.2s",
@@ -214,32 +217,25 @@ const RoundBtn = ({ icon, onClick, active }) => (
 );
 
 const styles = {
-    // ── Base ──
     overlay: {
         position: "fixed", inset: 0, zIndex: 9999,
         background: "#000",
         display: "flex", flexDirection: "column",
     },
     fullScreen: {
-        position: "relative",
-        flex: 1,
-        overflow: "hidden",
+        position: "relative", flex: 1, overflow: "hidden",
         background: "#111",
     },
-
-    // ── Remote video ──
     remoteVideo: {
         position: "absolute", inset: 0,
         width: "100%", height: "100%",
         objectFit: "cover",
+        background: "#000",
     },
-
-    // ── Voice call bg ──
     voiceBg: {
         position: "absolute", inset: 0,
         display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        gap: 16,
+        alignItems: "center", justifyContent: "center", gap: 16,
         background: "linear-gradient(160deg, #1a1d27 0%, #2d3557 100%)",
     },
     voiceAvatar: {
@@ -248,48 +244,64 @@ const styles = {
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: "2.5rem", color: "#fff", fontWeight: 700,
     },
-    voiceName: {
-        color: "#fff", fontSize: "1.4rem", fontWeight: 700, margin: 0,
-    },
-    voiceStatus: {
-        color: "#aaa", fontSize: "0.9rem", margin: 0,
-    },
-
-    // ── Caller name tag ──
+    voiceName: { color: "#fff", fontSize: "1.4rem", fontWeight: 700, margin: 0 },
+    voiceStatus: { color: "#aaa", fontSize: "0.9rem", margin: 0 },
     callerTag: {
         position: "absolute", top: 16, left: 16,
         display: "flex", alignItems: "center", gap: 8,
-        background: "rgba(0,0,0,0.5)",
-        backdropFilter: "blur(8px)",
+        background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
         color: "#fff", fontSize: "0.85rem", fontWeight: 600,
         padding: "6px 14px", borderRadius: 20,
     },
     callerTagDot: {
-        width: 8, height: 8, borderRadius: "50%",
-        background: "#22c55e",
+        width: 8, height: 8, borderRadius: "50%", background: "#22c55e",
     },
 
-    // ── PiP local video ──
+    // PiP
     pipWrapper: {
-        position: "absolute",
-        bottom: 100, right: 16,
+        position: "absolute", right: 16,
         width: 110, height: 160,
-        borderRadius: 16,
-        overflow: "hidden",
+        borderRadius: 16, overflow: "hidden",
         border: "2px solid rgba(255,255,255,0.3)",
         boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+        transition: "bottom 0.3s ease",
     },
-    pipVideo: {
-        width: "100%", height: "100%", objectFit: "cover",
+    pipVideo: { width: "100%", height: "100%", objectFit: "cover" },
+    pipCamOff: {
+        width: "100%", height: "100%",
+        background: "#1e1e2e",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", gap: 6,
     },
 
-    // ── Controls bar ──
+    // Screen share lower half local cam
+    screenShareLocalArea: {
+        position: "absolute",
+        bottom: 90, left: 0, right: 0,
+        height: "35%",
+        background: "#000",
+        display: "flex", alignItems: "center", justifyContent: "center",
+    },
+    screenShareLocalVideo: {
+        height: "100%",
+        maxWidth: "60%",
+        objectFit: "cover",
+        borderRadius: 12,
+    },
+    youLabel: {
+        position: "absolute", bottom: 8, left: "50%",
+        transform: "translateX(-50%)",
+        color: "#fff", fontSize: "0.75rem",
+        background: "rgba(0,0,0,0.5)",
+        padding: "2px 10px", borderRadius: 10,
+    },
+
+    // Controls
     controlsBar: {
         position: "absolute", bottom: 0, left: 0, right: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
-        gap: 16,
-        padding: "16px 20px 32px",
-        background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
+        gap: 16, padding: "16px 20px 32px",
+        background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)",
     },
     endCircle: {
         width: 56, height: 56, borderRadius: "50%",
@@ -298,40 +310,35 @@ const styles = {
         display: "flex", alignItems: "center", justifyContent: "center",
     },
 
-    // ── Incoming call ──
+    // Incoming
     incomingCard: {
         flex: 1,
         background: "linear-gradient(160deg, #1a1d27 0%, #2d3557 100%)",
         display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        gap: 8,
+        alignItems: "center", justifyContent: "center", gap: 8,
     },
     avatarLarge: {
-        width: 100, height: 100, borderRadius: "50%",
-        background: "#4f46e5",
+        width: 100, height: 100, borderRadius: "50%", background: "#4f46e5",
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: "2.5rem", color: "#fff", fontWeight: 700,
     },
     acceptCircle: {
         width: 64, height: 64, borderRadius: "50%",
-        background: "#22c55e", color: "#fff",
-        border: "none", fontSize: "1.5rem",
-        cursor: "pointer", display: "flex",
-        alignItems: "center", justifyContent: "center",
+        background: "#22c55e", color: "#fff", border: "none",
+        fontSize: "1.5rem", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
     },
     rejectCircle: {
         width: 64, height: 64, borderRadius: "50%",
-        background: "#e53935", color: "#fff",
-        border: "none", fontSize: "1.5rem",
-        cursor: "pointer", display: "flex",
-        alignItems: "center", justifyContent: "center",
+        background: "#e53935", color: "#fff", border: "none",
+        fontSize: "1.5rem", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
     },
 
-    // ── Chat sheet ──
+    // Chat sheet
     chatSheet: {
         position: "absolute", bottom: 0, left: 0, right: 0,
-        height: "55%",
-        background: "#1e1e2e",
+        height: "55%", background: "#1e1e2e",
         borderRadius: "20px 20px 0 0",
         display: "flex", flexDirection: "column",
         boxShadow: "0 -4px 30px rgba(0,0,0,0.5)",
@@ -342,23 +349,16 @@ const styles = {
     },
     chatSheetHeader: {
         display: "flex", justifyContent: "space-between",
-        alignItems: "center", padding: "8px 16px 8px",
+        alignItems: "center", padding: "8px 16px",
         borderBottom: "1px solid #333",
     },
-    chatNote: {
-        fontSize: "0.72rem", color: "#888", padding: "6px 16px",
-    },
+    chatNote: { fontSize: "0.72rem", color: "#888", padding: "6px 16px" },
     chatMessages: {
         flex: 1, overflowY: "auto", padding: 16,
         display: "flex", flexDirection: "column", gap: 10,
     },
-    chatMsg: {
-        background: "#2a2a3e", borderRadius: 10, padding: "8px 12px",
-    },
-    chatInput: {
-        display: "flex", gap: 8, padding: 12,
-        borderTop: "1px solid #333",
-    },
+    chatMsg: { background: "#2a2a3e", borderRadius: 10, padding: "8px 12px" },
+    chatInput: { display: "flex", gap: 8, padding: 12, borderTop: "1px solid #333" },
     chatInputBox: {
         flex: 1, background: "#2a2a3e", border: "none",
         borderRadius: 20, padding: "10px 14px",
