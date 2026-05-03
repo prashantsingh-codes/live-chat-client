@@ -8,6 +8,7 @@ import { ChatContext } from "../context/ChatContext.jsx";
 import { CallContext } from "../context/CallContext.jsx";
 import MessageSelf from "./MessageSelf.jsx";
 import MessageOthers from "./MessageOthers.jsx";
+import { globalSocket } from "../App.jsx";
 
 let socket;
 
@@ -55,7 +56,7 @@ const ChatArea = () => {
           setIsGroupChat(currentChat.isGroupChat);
           if (!currentChat.isGroupChat) {
             const other = currentChat.users.find(
-              (u) => u._id.toString() !== userData?._id.toString()
+              (u) => u._id.toString() !== userData?._id.toString(),
             );
             if (other) setOtherUserId(other._id.toString());
           }
@@ -116,12 +117,16 @@ const ChatArea = () => {
 
   // ── Setup socket ──
   useEffect(() => {
-    socket = io(backendUrl);
+    socket = globalSocket; // ✅ reuse the same socket
     socket.emit("setup", userData);
     socket.on("connected", () => setSocketConnected(true));
     socket.on("typing", () => setIsTyping(true));
     socket.on("stop typing", () => setIsTyping(false));
-    return () => { socket.disconnect(); };
+    return () => {
+      socket.off("connected");
+      socket.off("typing");
+      socket.off("stop typing");
+    };
   }, []);
 
   // ── Listen for new messages ──
@@ -135,7 +140,9 @@ const ChatArea = () => {
         setRefresh((prev) => !prev);
       }
     });
-    return () => { socket.off("message received"); };
+    return () => {
+      socket.off("message received");
+    };
   }, [chat_id]);
 
   // ── Fetch on chat change ──
@@ -170,7 +177,10 @@ const ChatArea = () => {
 
   if (!userData) {
     return (
-      <div className={`chatArea-container${lightTheme ? "" : " dark"}`} style={{ gap: 16, padding: 20 }}>
+      <div
+        className={`chatArea-container${lightTheme ? "" : " dark"}`}
+        style={{ gap: 16, padding: 20 }}
+      >
         <div className="skeleton" style={{ height: 60, width: "100%" }} />
         <div className="skeleton" style={{ flex: 1, width: "100%" }} />
         <div className="skeleton" style={{ height: 56, width: "100%" }} />
@@ -180,7 +190,10 @@ const ChatArea = () => {
 
   if (!loaded) {
     return (
-      <div className={`chatArea-container${lightTheme ? "" : " dark"}`} style={{ gap: 16, padding: 20 }}>
+      <div
+        className={`chatArea-container${lightTheme ? "" : " dark"}`}
+        style={{ gap: 16, padding: 20 }}
+      >
         <div className="skeleton" style={{ height: 60, width: "100%" }} />
         <div className="skeleton" style={{ flex: 1, width: "100%" }} />
         <div className="skeleton" style={{ height: 56, width: "100%" }} />
@@ -190,19 +203,31 @@ const ChatArea = () => {
 
   return (
     <div className={`chatArea-container${lightTheme ? "" : " dark"}`}>
-
       {/* ── Header ── */}
       <div className={`chatArea-header${lightTheme ? "" : " dark"}`}>
-        <div className="convo-avatar" style={{
-          width: 38, height: 38, fontSize: "0.9rem",
-          background: isGroupChat ? "#6c63ff" : "var(--accent)",
-        }}>
+        <div
+          className="convo-avatar"
+          style={{
+            width: 38,
+            height: 38,
+            fontSize: "0.9rem",
+            background: isGroupChat ? "#6c63ff" : "var(--accent)",
+          }}
+        >
           {chat_user[0].toUpperCase()}
         </div>
         <div style={{ flex: 1 }}>
-          <p className={`chat-header-name${lightTheme ? "" : " dark"}`}>{chat_user}</p>
+          <p className={`chat-header-name${lightTheme ? "" : " dark"}`}>
+            {chat_user}
+          </p>
           {isTyping && (
-            <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginTop: 2 }}>
+            <p
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--accent)",
+                marginTop: 2,
+              }}
+            >
               typing...
             </p>
           )}
@@ -222,8 +247,15 @@ const ChatArea = () => {
               title="Voice Call"
               style={callBtnStyle(lightTheme)}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </button>
             <button
@@ -237,9 +269,16 @@ const ChatArea = () => {
               title="Video Call"
               style={callBtnStyle(lightTheme)}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="23 7 16 12 23 17 23 7"/>
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
             </button>
           </div>
@@ -251,20 +290,40 @@ const ChatArea = () => {
             onClick={leaveGroup}
             title="Leave Group"
             style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "6px 12px", border: "1.5px solid #ff4d4f",
-              borderRadius: "8px", background: "transparent",
-              color: "#ff4d4f", fontSize: "0.8rem", fontWeight: 500,
-              fontFamily: "DM Sans, sans-serif", cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              border: "1.5px solid #ff4d4f",
+              borderRadius: "8px",
+              background: "transparent",
+              color: "#ff4d4f",
+              fontSize: "0.8rem",
+              fontWeight: 500,
+              fontFamily: "DM Sans, sans-serif",
+              cursor: "pointer",
               transition: "background 0.15s, color 0.15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#ff4d4f"; e.currentTarget.style.color = "white"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#ff4d4f"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#ff4d4f";
+              e.currentTarget.style.color = "white";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "#ff4d4f";
+            }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             Leave Group
           </button>
@@ -278,7 +337,13 @@ const ChatArea = () => {
           if (message.sender._id.toString() === userData._id.toString()) {
             return <MessageSelf key={message._id || index} message={message} />;
           } else {
-            return <MessageOthers key={message._id || index} message={message} lightTheme={lightTheme} />;
+            return (
+              <MessageOthers
+                key={message._id || index}
+                message={message}
+                lightTheme={lightTheme}
+              />
+            );
           }
         })}
         <div ref={messagesEndRef} />
@@ -291,12 +356,21 @@ const ChatArea = () => {
           placeholder="Type a message..."
           value={messageContent}
           onChange={handleTyping}
-          onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") sendMessage();
+          }}
         />
         <button className="send-btn" onClick={sendMessage}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
         </button>
       </div>
@@ -305,11 +379,17 @@ const ChatArea = () => {
 };
 
 const callBtnStyle = (lightTheme) => ({
-  display: "flex", alignItems: "center", justifyContent: "center",
-  width: 36, height: 36, borderRadius: "50%", border: "none",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 36,
+  height: 36,
+  borderRadius: "50%",
+  border: "none",
   background: lightTheme ? "#f0f0f0" : "rgba(255,255,255,0.1)",
   color: lightTheme ? "#333" : "#fff",
-  cursor: "pointer", transition: "background 0.15s",
+  cursor: "pointer",
+  transition: "background 0.15s",
 });
 
 export default ChatArea;

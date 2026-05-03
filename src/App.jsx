@@ -43,5 +43,6 @@ function App() {
         </ChatContextProvider>
     );
 }
-
+// In App.jsx — add export
+export const globalSocket = io(backendUrl, { autoConnect: true });
 export default App;

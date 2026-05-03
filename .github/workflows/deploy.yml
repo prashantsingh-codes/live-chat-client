@@ -17,9 +17,12 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            cd ~/live-chat-app/live-chat-client
-            git pull origin main
-            npm install
-            npm run build
-            sudo cp -r dist/* /var/www/livechat/dist/
-            sudo chown -R www-data:www-data /var/www/livechat/dist
+              cd ~/live-chat-app/live-chat-client
+              git fetch origin main
+              git reset --hard origin/main
+              npm install
+              npm run build
+              sudo chown -R ubuntu:ubuntu /var/www/livechat/dist
+              sudo cp -r dist/* /var/www/livechat/dist/
+              sudo chown -R www-data:www-data /var/www/livechat/dist
+              sudo systemctl reload nginx
