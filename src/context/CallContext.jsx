@@ -51,6 +51,7 @@ const CallContextProvider = ({ children, socket }) => {
     });
 
     const [localStream, setLocalStream] = useState(null);
+    const [remoteStream, setRemoteStream] = useState(null);
     const [screenSharing, setScreenSharing] = useState(false);
     const [callMessages, setCallMessages] = useState([]);
 
@@ -87,6 +88,13 @@ const CallContextProvider = ({ children, socket }) => {
         };
     }, [socket]);
 
+    // Assign remote stream to ref whenever stream arrives or ref mounts
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream, callState.accepted]);
+
     const startCall = async (receiverSocketId, receiverName, callType, chatId) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -115,10 +123,7 @@ const CallContextProvider = ({ children, socket }) => {
                 });
             });
 
-            peer.on("stream", (remote) => {
-                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote;
-            });
-
+            peer.on("stream", (remote) => setRemoteStream(remote));
             peer.on("error", (err) => console.log("Peer error:", err));
 
             peerRef.current = peer;
@@ -156,10 +161,7 @@ const CallContextProvider = ({ children, socket }) => {
                 });
             });
 
-            peer.on("stream", (remote) => {
-                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote;
-            });
-
+            peer.on("stream", (remote) => setRemoteStream(remote));
             peer.on("error", (err) => console.log("Peer error:", err));
 
             peer.signal(callState.incomingSignal);
@@ -183,6 +185,7 @@ const CallContextProvider = ({ children, socket }) => {
         peerRef.current?.destroy();
         localStream?.getTracks().forEach((t) => t.stop());
         setLocalStream(null);
+        setRemoteStream(null);
         setCallState({ active: false, incoming: false, accepted: false });
         setCallMessages([]);
         setScreenSharing(false);
@@ -217,7 +220,7 @@ const CallContextProvider = ({ children, socket }) => {
 
     return (
         <CallContext.Provider value={{
-            callState, localStream,
+            callState, localStream, remoteStream,
             localVideoRef, remoteVideoRef,
             startCall, acceptCall, rejectCall, endCall,
             toggleScreenShare, screenSharing,

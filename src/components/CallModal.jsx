@@ -87,8 +87,15 @@ const CallModal = () => {
                         <video ref={remoteVideoRef} autoPlay playsInline style={styles.remoteVideo} />
                     ) : (
                         <>
-                            {/* Hidden audio element — this is the fix for voice calls */}
-                            <audio ref={remoteVideoRef} autoPlay />
+                            {/* ref callback ensures srcObject is set even if stream arrived before mount */}
+                            <audio
+                                ref={(node) => {
+                                    remoteVideoRef.current = node;
+                                    if (node && node.srcObject) node.play().catch(() => {});
+                                }}
+                                autoPlay
+                                playsInline
+                            />
                             <div style={styles.voiceScreen}>
                                 <div style={styles.avatarLarge}>
                                     {callState.callerName?.[0]?.toUpperCase()}
