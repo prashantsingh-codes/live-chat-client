@@ -185,9 +185,30 @@ const CtrlBtn = ({ icon, label, onClick, active }) => (
 
 const styles = {
     overlay: { position: "fixed", inset: 0, background: "#000", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" },
-    meetContainer: { display: "grid", width: "100%", height: "100vh" },
-    videoArea: { position: "relative", background: "#111", display: "flex", alignItems: "center", justifyContent: "center" },
-    remoteVideo: { width: "100%", height: "100%", objectFit: "cover" },
+meetContainer: { 
+    display: "grid", 
+    width: "100%", 
+    height: "100vh",
+    overflow: "hidden",
+    position: "relative",
+},
+videoArea: { 
+    position: "relative", 
+    background: "#111", 
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center",
+    width: "100%",
+    height: "100vh",
+    overflow: "hidden",
+},
+remoteVideo: { 
+    position: "absolute",
+    inset: 0,
+    width: "100%", 
+    height: "100%", 
+    objectFit: "cover" 
+},
     localVideo: { position: "absolute", bottom: 90, right: 16, width: 180, height: 120, borderRadius: 12, objectFit: "cover", border: "2px solid #444" },
     voiceScreen: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 },
     remoteName: { position: "absolute", bottom: 90, left: 16, color: "#fff", fontSize: "0.9rem", background: "rgba(0,0,0,0.4)", padding: "4px 10px", borderRadius: 6 },
