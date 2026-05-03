@@ -5,25 +5,26 @@ export const CallContext = createContext();
 
 const iceServers = {
     iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
         {
-            urls: "turn:livechat.metered.live:80",
+            urls: "stun:stun.relay.metered.ca:80",
+        },
+        {
+            urls: "turn:global.relay.metered.ca:80",
             username: "6f0da3829a330d35398d8232",
             credential: "X4AekrIXhIHpck5G",
         },
         {
-            urls: "turn:livechat.metered.live:443",
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
             username: "6f0da3829a330d35398d8232",
             credential: "X4AekrIXhIHpck5G",
         },
         {
-            urls: "turns:livechat.metered.live:443",
+            urls: "turn:global.relay.metered.ca:443",
             username: "6f0da3829a330d35398d8232",
             credential: "X4AekrIXhIHpck5G",
         },
         {
-            urls: "turn:livechat.metered.live:80?transport=tcp",
+            urls: "turns:global.relay.metered.ca:443?transport=tcp",
             username: "6f0da3829a330d35398d8232",
             credential: "X4AekrIXhIHpck5G",
         },
