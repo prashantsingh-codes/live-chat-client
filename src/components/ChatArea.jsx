@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useSelector } from "react-redux";
-import { io } from "socket.io-client";
 import { toast } from "react-toastify";
 import { ChatContext } from "../context/ChatContext.jsx";
 import { CallContext } from "../context/CallContext.jsx";
@@ -28,7 +27,6 @@ const ChatArea = () => {
   const [typing, setTyping] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isGroupChat, setIsGroupChat] = useState(false);
-  const [receiverSocketId, setReceiverSocketId] = useState(null);
   const [otherUserId, setOtherUserId] = useState(null);
   const messagesEndRef = useRef(null);
 
@@ -56,7 +54,7 @@ const ChatArea = () => {
           setIsGroupChat(currentChat.isGroupChat);
           if (!currentChat.isGroupChat) {
             const other = currentChat.users.find(
-              (u) => u._id.toString() !== userData?._id.toString(),
+              (u) => u._id.toString() !== userData?._id.toString()
             );
             if (other) setOtherUserId(other._id.toString());
           }
@@ -66,16 +64,6 @@ const ChatArea = () => {
       console.log(error);
     }
   };
-
-  // ── Get receiver socket ID when otherUserId is known ──
-  useEffect(() => {
-    if (!otherUserId) return;
-    console.log("Looking up socket for:", otherUserId);
-    globalSocket.emit("get-socket-id", otherUserId, (socketId) => {
-      console.log("Got socketId:", socketId);
-      setReceiverSocketId(socketId);
-    });
-  }, [otherUserId]);
 
   // ── Leave group ──
   const leaveGroup = async () => {
@@ -117,9 +105,33 @@ const ChatArea = () => {
     }
   };
 
+  // ── Handle voice call ──
+  const handleVoiceCall = () => {
+    if (!otherUserId) return;
+    globalSocket.emit("get-socket-id", otherUserId, (socketId) => {
+      if (!socketId) {
+        toast.error("User is offline");
+        return;
+      }
+      startCall(socketId, chat_user, "voice", chat_id);
+    });
+  };
+
+  // ── Handle video call ──
+  const handleVideoCall = () => {
+    if (!otherUserId) return;
+    globalSocket.emit("get-socket-id", otherUserId, (socketId) => {
+      if (!socketId) {
+        toast.error("User is offline");
+        return;
+      }
+      startCall(socketId, chat_user, "video", chat_id);
+    });
+  };
+
   // ── Setup socket ──
   useEffect(() => {
-    socket = globalSocket; // ✅ reuse the same socket
+    socket = globalSocket;
     socket.emit("setup", userData);
     socket.on("connected", () => setSocketConnected(true));
     socket.on("typing", () => setIsTyping(true));
@@ -205,14 +217,13 @@ const ChatArea = () => {
 
   return (
     <div className={`chatArea-container${lightTheme ? "" : " dark"}`}>
+
       {/* ── Header ── */}
       <div className={`chatArea-header${lightTheme ? "" : " dark"}`}>
         <div
           className="convo-avatar"
           style={{
-            width: 38,
-            height: 38,
-            fontSize: "0.9rem",
+            width: 38, height: 38, fontSize: "0.9rem",
             background: isGroupChat ? "#6c63ff" : "var(--accent)",
           }}
         >
@@ -223,13 +234,7 @@ const ChatArea = () => {
             {chat_user}
           </p>
           {isTyping && (
-            <p
-              style={{
-                fontSize: "0.75rem",
-                color: "var(--accent)",
-                marginTop: 2,
-              }}
-            >
+            <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginTop: 2 }}>
               typing...
             </p>
           )}
@@ -239,46 +244,20 @@ const ChatArea = () => {
         {!isGroupChat && (
           <div style={{ display: "flex", gap: 8, marginRight: 12 }}>
             <button
-              onClick={() => {
-                if (!receiverSocketId) {
-                  toast.error("User is offline");
-                  return;
-                }
-                startCall(receiverSocketId, chat_user, "voice", chat_id);
-              }}
+              onClick={handleVoiceCall}
               title="Voice Call"
               style={callBtnStyle(lightTheme)}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </button>
             <button
-              onClick={() => {
-                if (!receiverSocketId) {
-                  toast.error("User is offline");
-                  return;
-                }
-                startCall(receiverSocketId, chat_user, "video", chat_id);
-              }}
+              onClick={handleVideoCall}
               title="Video Call"
               style={callBtnStyle(lightTheme)}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="23 7 16 12 23 17 23 7" />
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
@@ -292,18 +271,11 @@ const ChatArea = () => {
             onClick={leaveGroup}
             title="Leave Group"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "6px 12px",
-              border: "1.5px solid #ff4d4f",
-              borderRadius: "8px",
-              background: "transparent",
-              color: "#ff4d4f",
-              fontSize: "0.8rem",
-              fontWeight: 500,
-              fontFamily: "DM Sans, sans-serif",
-              cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "6px 12px", border: "1.5px solid #ff4d4f",
+              borderRadius: "8px", background: "transparent",
+              color: "#ff4d4f", fontSize: "0.8rem", fontWeight: 500,
+              fontFamily: "DM Sans, sans-serif", cursor: "pointer",
               transition: "background 0.15s, color 0.15s",
             }}
             onMouseEnter={(e) => {
@@ -315,14 +287,7 @@ const ChatArea = () => {
               e.currentTarget.style.color = "#ff4d4f";
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
@@ -363,14 +328,7 @@ const ChatArea = () => {
           }}
         />
         <button className="send-btn" onClick={sendMessage}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="22" y1="2" x2="11" y2="13" />
             <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
@@ -381,17 +339,11 @@ const ChatArea = () => {
 };
 
 const callBtnStyle = (lightTheme) => ({
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 36,
-  height: 36,
-  borderRadius: "50%",
-  border: "none",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  width: 36, height: 36, borderRadius: "50%", border: "none",
   background: lightTheme ? "#f0f0f0" : "rgba(255,255,255,0.1)",
   color: lightTheme ? "#333" : "#fff",
-  cursor: "pointer",
-  transition: "background 0.15s",
+  cursor: "pointer", transition: "background 0.15s",
 });
 
 export default ChatArea;
