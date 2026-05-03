@@ -1,5 +1,5 @@
 import { createContext, useState, useRef, useContext, useEffect } from "react";
-import SimplePeer from "simple-peer/simplepeer.min.js";
+import SimplePeer from "simple-peer";
 import { ChatContext } from "./ChatContext.jsx";
 
 export const CallContext = createContext();
