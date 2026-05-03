@@ -1,22 +1,24 @@
-name: Deploy Frontend to EC2
+name: Deploy Frontend
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/live-chat-client
-            git pull
+            cd ~/live-chat-app/live-chat-client
+            git pull origin main
             npm install
             npm run build
             sudo cp -r dist/* /var/www/html/
