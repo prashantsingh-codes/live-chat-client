@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { globalSocket } from "../App.jsx";
 
 export const ChatContext = createContext();
 
@@ -39,15 +40,16 @@ const ChatContextProvider = (props) => {
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
-                // FIX BUG 1 & 3: userData stored as full response object
-                // token is at parsed.token (not parsed.data.token)
                 const user = parsed.data ? parsed.data : parsed;
                 setUserData(user);
                 setToken(user.token);
                 axios.defaults.headers.common["Authorization"] = `Bearer ${user.token}`;
+
+                // ✅ Emit setup on global socket so userSocketMap is populated
+                globalSocket.emit("setup", user);
+
                 fetchChats();
             } catch (e) {
-                // corrupted localStorage — clear and redirect to login
                 localStorage.removeItem("userData");
                 navigate("/");
             }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { Route, Routes } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ToastContainer } from "react-toastify";
@@ -15,9 +15,8 @@ import Users from "./components/Users.jsx";
 import Groups from "./components/Groups.jsx";
 import CreateGroups from "./components/CreateGroups.jsx";
 
-// Global socket for call signaling
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
-const globalSocket = io(backendUrl, { autoConnect: true });
+export const globalSocket = io(backendUrl, { autoConnect: true });
 
 function App() {
     const lightTheme = useSelector((state) => state.themeKey);
@@ -43,6 +42,5 @@ function App() {
         </ChatContextProvider>
     );
 }
-// In App.jsx — add export
-export const globalSocket = io(backendUrl, { autoConnect: true });
+
 export default App;

@@ -4,6 +4,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { ChatContext } from "../context/ChatContext.jsx";
+import { globalSocket } from "../App.jsx";
 
 const Login = () => {
     const lightTheme = useSelector((state) => state.themeKey);
@@ -28,9 +29,9 @@ const Login = () => {
                 const response = await axios.post(backendUrl + "/api/user/register", { name, email, password });
                 if (response.data.success) {
                     const user = response.data;
-                    // store flat user object — no nesting
                     setToken(user.token);
                     setUserData(user);
+                    globalSocket.emit("setup", user); // ✅ register socket
                     axios.defaults.headers.common["Authorization"] = `Bearer ${user.token}`;
                     localStorage.setItem("userData", JSON.stringify(user));
                     navigate("/app/welcome");
@@ -43,6 +44,7 @@ const Login = () => {
                     const user = response.data;
                     setToken(user.token);
                     setUserData(user);
+                    globalSocket.emit("setup", user); // ✅ register socket
                     axios.defaults.headers.common["Authorization"] = `Bearer ${user.token}`;
                     localStorage.setItem("userData", JSON.stringify(user));
                     navigate("/app/welcome");
