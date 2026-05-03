@@ -81,20 +81,24 @@ const CallModal = () => {
                 ...styles.meetContainer,
                 gridTemplateColumns: showChat ? "1fr 320px" : "1fr"
             }}>
-                {/* ── Video Area ── */}
+                {/* ── Video / Audio Area ── */}
                 <div style={styles.videoArea}>
                     {callState.callType === "video" ? (
                         <video ref={remoteVideoRef} autoPlay playsInline style={styles.remoteVideo} />
                     ) : (
-                        <div style={styles.voiceScreen}>
-                            <div style={styles.avatarLarge}>
-                                {callState.callerName?.[0]?.toUpperCase()}
+                        <>
+                            {/* Hidden audio element — this is the fix for voice calls */}
+                            <audio ref={remoteVideoRef} autoPlay />
+                            <div style={styles.voiceScreen}>
+                                <div style={styles.avatarLarge}>
+                                    {callState.callerName?.[0]?.toUpperCase()}
+                                </div>
+                                <p style={{ color: "#fff", fontSize: "1.4rem", fontWeight: 600 }}>
+                                    {callState.callerName}
+                                </p>
+                                <p style={{ color: "#aaa" }}>Voice call in progress...</p>
                             </div>
-                            <p style={{ color: "#fff", fontSize: "1.4rem", fontWeight: 600 }}>
-                                {callState.callerName}
-                            </p>
-                            <p style={{ color: "#aaa" }}>Voice call in progress...</p>
-                        </div>
+                        </>
                     )}
 
                     {callState.callType === "video" && (

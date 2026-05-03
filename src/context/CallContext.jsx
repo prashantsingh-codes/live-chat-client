@@ -5,9 +5,7 @@ export const CallContext = createContext();
 
 const iceServers = {
     iceServers: [
-        {
-            urls: "stun:stun.relay.metered.ca:80",
-        },
+        { urls: "stun:stun.relay.metered.ca:80" },
         {
             urls: "turn:global.relay.metered.ca:80",
             username: "6f0da3829a330d35398d8232",
@@ -29,6 +27,12 @@ const iceServers = {
             credential: "X4AekrIXhIHpck5G",
         },
     ]
+};
+
+const audioConstraints = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    sampleRate: 44100,
 };
 
 const CallContextProvider = ({ children, socket }) => {
@@ -87,7 +91,7 @@ const CallContextProvider = ({ children, socket }) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: callType === "video",
-                audio: true,
+                audio: audioConstraints,
             });
             setLocalStream(stream);
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
@@ -133,7 +137,7 @@ const CallContextProvider = ({ children, socket }) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: callState.callType === "video",
-                audio: true,
+                audio: audioConstraints,
             });
             setLocalStream(stream);
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
