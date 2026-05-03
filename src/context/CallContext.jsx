@@ -1,5 +1,5 @@
 import { createContext, useState, useRef, useContext, useEffect } from "react";
-import SimplePeer from "simple-peer";
+// import SimplePeer from "simple-peer";
 import { ChatContext } from "./ChatContext.jsx";
 
 export const CallContext = createContext();
@@ -65,7 +65,7 @@ const CallContextProvider = ({ children, socket }) => {
             setLocalStream(stream);
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
-            const peer = new SimplePeer({
+            const peer = new window.SimplePeer({
                 initiator: true, trickle: false, stream,
                 config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
             });
@@ -109,7 +109,7 @@ const CallContextProvider = ({ children, socket }) => {
             setLocalStream(stream);
             if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
-            const peer = new SimplePeer({
+            const peer = new window.SimplePeer({
                 initiator: false, trickle: false, stream,
                 config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
             });
