@@ -637,9 +637,9 @@ textarea:focus, input:focus { outline: none; }
 
 .list-title.dark { color: var(--dark-text); }
 
-/* ── CHANGE: Hide refresh icon in list header ── */
+/* ── FIX 5: Show refresh icon in list header ── */
 .list-header .icon-btn {
-  display: none;
+  display: flex;
 }
 
 /* ── List Search ── */
@@ -779,12 +779,67 @@ textarea:focus, input:focus { outline: none; }
   100% { background-position: -200% 0; }
 }
 
-/* ── Responsive ── */
+/* ══════════════════════════════════════
+   RESPONSIVE — MOBILE
+══════════════════════════════════════ */
 @media (max-width: 640px) {
   .main-container { width: 100vw; height: 100vh; border-radius: 0; }
-  .login-banner { display: none; }
-  .login-form-area { padding: 30px 24px; }
 
+  /* ── FIX 1: Mobile login — centered card with logo ── */
+  .login-page {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: var(--light-bg);
+  }
+
+  .login-page.dark { background: var(--dark-bg); }
+
+  .login-banner { display: none; }
+
+  .login-form-area {
+    width: 100%;
+    max-width: 400px;
+    padding: 32px 28px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    background: var(--light-surface);
+    gap: 14px;
+    /* Add logo above the form */
+    position: relative;
+  }
+
+  .login-form-area.dark {
+    background: var(--dark-surface);
+    box-shadow: var(--shadow-dark);
+  }
+
+  /* LiveChat logo above "Welcome back" on mobile */
+  .login-form-area::before {
+    content: 'LiveChat';
+    display: block;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .login-heading {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  .login-sub {
+    text-align: center;
+  }
+
+  /* ── FIX 2: Mobile sidebar — icons column, logout always visible ── */
   .sidebar-container {
     width: 64px;
     min-width: 64px;
@@ -792,6 +847,7 @@ textarea:focus, input:focus { outline: none; }
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow: visible;
   }
 
   .sb-search,
@@ -799,20 +855,20 @@ textarea:focus, input:focus { outline: none; }
   .sb-logo { display: none; }
 
   .sb-header {
-    flex: 1;
+    flex-shrink: 0;
     width: 100%;
     height: auto;
     flex-direction: column;
     justify-content: flex-start;
     align-items: center;
-    padding: 0;
+    padding: 12px 0 8px;
     gap: 0;
     border-bottom: none;
     border-right: none;
     overflow: visible;
   }
 
-  /* FIX 2: favicon shown at top of sidebar */
+  /* LiveChat favicon at top of mobile sidebar */
   .sb-header::before {
     content: '';
     display: block;
@@ -820,20 +876,20 @@ textarea:focus, input:focus { outline: none; }
     height: 32px;
     background: url('/favicon.svg') center/cover no-repeat;
     border-radius: 8px;
-    margin: 12px 0 8px;
+    margin-bottom: 8px;
     flex-shrink: 0;
   }
 
- .sb-icons {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;  /* ← group them in the center */
-  gap: 50px;                 /* ← control exact spacing between icons */
-  width: 100%;
-  padding: 16px 0;
-}
+  .sb-icons {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    padding: 16px 0;
+  }
 
   .sb-icon-btn {
     width: 40px;
@@ -841,19 +897,27 @@ textarea:focus, input:focus { outline: none; }
     border-radius: 10px;
   }
 
-  /* FIX 1: match footer height so logout aligns with input area */
+  /* FIX 2: logout always visible — pinned at bottom, never scrolls away */
   .sb-logout {
     flex-shrink: 0;
-    height: var(--footer-height);   /* ← matches text-input-area height */
+    height: var(--footer-height);
     width: 100%;
     padding: 0;
     border-top: 1px solid var(--light-border);
     display: flex;
     align-items: center;
     justify-content: center;
+    /* KEY: position sticky so it stays visible */
+    position: sticky;
+    bottom: 0;
+    background: var(--light-surface);
+    z-index: 1;
   }
 
-  .sb-logout.dark { border-top-color: var(--dark-border); }
+  .sb-logout.dark {
+    border-top-color: var(--dark-border);
+    background: var(--dark-surface);
+  }
 
   .sb-logout button span,
   .sb-logout button .logout-label { display: none; }
