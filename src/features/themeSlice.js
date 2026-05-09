@@ -1,10 +1,19 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+// ✅ Read saved theme from localStorage on app start (true = light, false = dark)
+const savedTheme = localStorage.getItem("theme");
+const initialState = savedTheme !== null ? savedTheme === "light" : true;
+
 export const themeSlice = createSlice({
     name: "themeSlice",
-    initialState: true,
+    initialState,
     reducers: {
-        toggleTheme: (state) => !state
+        toggleTheme: (state) => {
+            const next = !state;
+            // ✅ Persist to localStorage so refresh remembers the theme
+            localStorage.setItem("theme", next ? "light" : "dark");
+            return next;
+        }
     }
 });
 
