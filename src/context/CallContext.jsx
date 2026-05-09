@@ -59,27 +59,26 @@ const CallContextProvider = ({ children, socket }) => {
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const screenTrackRef = useRef(null);
-    const localStreamRef = useRef(null); // always up-to-date stream ref
+    const localStreamRef = useRef(null);
 
-    // Keep localStreamRef in sync
+    // Keep refs in sync
     useEffect(() => {
         localStreamRef.current = localStream;
     }, [localStream]);
 
-    // Assign remote stream to ref after render
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
         }
     }, [remoteStream, callState.accepted]);
 
-    // Assign local stream to localVideoRef after render
     useEffect(() => {
         if (localVideoRef.current && localStream) {
             localVideoRef.current.srcObject = localStream;
         }
     }, [localStream, callState.accepted]);
 
+    // ── Socket listeners ──
     useEffect(() => {
         if (!socket) return;
 
@@ -101,10 +100,28 @@ const CallContextProvider = ({ children, socket }) => {
 
         socket.on("call:ended", () => endCall(false));
 
+        // ✅ Show other person's messages in the in-call chat panel
+        socket.on("message received", (newMessage) => {
+            setCallState((prev) => {
+                if (!prev.active || !prev.accepted) return prev;
+                if (newMessage?.chat?._id !== prev.chatId) return prev;
+                setCallMessages((msgs) => [
+                    ...msgs,
+                    {
+                        sender: newMessage.sender?.name || "Unknown",
+                        content: newMessage.content,
+                        time: new Date().toLocaleTimeString(),
+                    },
+                ]);
+                return prev;
+            });
+        });
+
         return () => {
             socket.off("call:incoming");
             socket.off("call:accepted");
             socket.off("call:ended");
+            socket.off("message received");
         };
     }, [socket]);
 
@@ -192,7 +209,6 @@ const CallContextProvider = ({ children, socket }) => {
     };
 
     const endCall = (emit = true) => {
-        console.trace("endCall called, emit:", emit);
         if (emit) {
             const targetSocketId = callState.callerSocketId || callState.receiverSocketId;
             socket.emit("call:ended", { toSocketId: targetSocketId });
@@ -215,14 +231,11 @@ const CallContextProvider = ({ children, socket }) => {
                 const screenTrack = screenStream.getVideoTracks()[0];
                 screenTrackRef.current = screenTrack;
 
-                // Replace video track in peer
                 const sender = peerRef.current?._pc?.getSenders()
                     .find((s) => s.track?.kind === "video");
                 await sender?.replaceTrack(screenTrack);
 
-                // Show screen in local preview
                 if (localVideoRef.current) {
-                    // Merge screen video + original audio into one stream for preview
                     const previewStream = new MediaStream([
                         screenTrack,
                         ...localStreamRef.current.getAudioTracks(),
@@ -248,7 +261,6 @@ const CallContextProvider = ({ children, socket }) => {
                     .find((s) => s.track?.kind === "video");
                 await sender?.replaceTrack(camTrack);
             }
-            // Restore camera preview
             if (localVideoRef.current && localStreamRef.current) {
                 localVideoRef.current.srcObject = localStreamRef.current;
             }
@@ -260,7 +272,6 @@ const CallContextProvider = ({ children, socket }) => {
         }
     };
 
-    // Expose toggleCam here so it uses localStreamRef (never stale)
     const toggleCamTrack = (enable) => {
         localStreamRef.current?.getVideoTracks().forEach((t) => {
             t.enabled = enable;
