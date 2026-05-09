@@ -61,11 +61,18 @@ const CallContextProvider = ({ children, socket }) => {
     const screenTrackRef = useRef(null);
     const localStreamRef = useRef(null);
     const callStateRef = useRef(callState);
+    const userDataRef = useRef(userData); // ✅ fixes stale closure bug
 
     // Keep callStateRef always in sync
     useEffect(() => {
         callStateRef.current = callState;
     }, [callState]);
+
+    // Keep userDataRef always in sync
+    useEffect(() => {
+        userDataRef.current = userData;
+        console.log("[CallContext] userDataRef updated →", userData?._id, userData?.name);
+    }, [userData]);
 
     // Keep localStreamRef in sync
     useEffect(() => {
@@ -106,16 +113,34 @@ const CallContextProvider = ({ children, socket }) => {
 
         socket.on("call:ended", () => endCall(false));
 
-        // ✅ Only add messages from the OTHER person (not our own sent messages)
         socket.on("message received", (newMessage) => {
             const cs = callStateRef.current;
-            if (!cs.active || !cs.accepted) return;
-            if (!newMessage?.chat?._id) return;
-            if (newMessage.chat._id !== cs.chatId) return;
+            const me = userDataRef.current; // ✅ always fresh, no stale closure
 
-            // ✅ Skip if the sender is the current user (we already added it via sendCallMessage)
-            if (newMessage.sender?._id === userData._id) return;
+            console.log("[CallContext] 'message received' fired");
+            console.log("[CallContext] newMessage →", newMessage);
+            console.log("[CallContext] cs.active →", cs.active, "| cs.accepted →", cs.accepted);
+            console.log("[CallContext] cs.chatId →", cs.chatId, "| msg chatId →", newMessage?.chat?._id);
+            console.log("[CallContext] me._id →", me?._id, "| sender._id →", newMessage?.sender?._id);
 
+            if (!cs.active || !cs.accepted) {
+                console.log("[CallContext] SKIPPED — call not active/accepted");
+                return;
+            }
+            if (!newMessage?.chat?._id) {
+                console.log("[CallContext] SKIPPED — message has no chat._id");
+                return;
+            }
+            if (newMessage.chat._id !== cs.chatId) {
+                console.log("[CallContext] SKIPPED — chatId mismatch");
+                return;
+            }
+            if (newMessage.sender?._id === me?._id) {
+                console.log("[CallContext] SKIPPED — own message, already added via sendCallMessage");
+                return;
+            }
+
+            console.log("[CallContext] ✅ adding incoming message to callMessages");
             setCallMessages((msgs) => [
                 ...msgs,
                 {
@@ -134,15 +159,16 @@ const CallContextProvider = ({ children, socket }) => {
         };
     }, [socket]);
 
-    // ✅ NEW: Call this from your chat input component when the current user sends a message
+    // ✅ Call this from your chat input component when the current user sends a message
     const sendCallMessage = (content) => {
+        console.log("[CallContext] sendCallMessage →", content);
         setCallMessages((msgs) => [
             ...msgs,
             {
-                sender: userData.name,
+                sender: userDataRef.current?.name || "You",
                 content,
                 time: new Date().toLocaleTimeString(),
-                isSelf: true, // optional: useful for styling your own messages differently
+                isSelf: true,
             },
         ]);
     };
@@ -308,7 +334,7 @@ const CallContextProvider = ({ children, socket }) => {
             toggleScreenShare, screenSharing,
             toggleCamTrack,
             callMessages, setCallMessages,
-            sendCallMessage, // ✅ expose so the chat input component can call it
+            sendCallMessage,
         }}>
             {children}
         </CallContext.Provider>
