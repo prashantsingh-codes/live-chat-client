@@ -61,7 +61,7 @@ const CallContextProvider = ({ children, socket }) => {
     const screenTrackRef = useRef(null);
     const localStreamRef = useRef(null);
     const callStateRef = useRef(callState);
-    const userDataRef = useRef(userData); // ✅ fixes stale closure bug
+    const userDataRef = useRef(userData); // ✅ single source of truth, never stale
 
     // Keep callStateRef always in sync
     useEffect(() => {
@@ -115,7 +115,7 @@ const CallContextProvider = ({ children, socket }) => {
 
         socket.on("message received", (newMessage) => {
             const cs = callStateRef.current;
-            const me = userDataRef.current; // ✅ always fresh, no stale closure
+            const me = userDataRef.current; // ✅ always fresh
 
             console.log("[CallContext] 'message received' fired");
             console.log("[CallContext] newMessage →", newMessage);
@@ -194,9 +194,9 @@ const CallContextProvider = ({ children, socket }) => {
                 socket.emit("call:initiate", {
                     toSocketId: receiverSocketId,
                     fromSocketId: socket.id,
-                    from: userData._id,
+                    from: userDataRef.current?._id,       // ✅ was userData._id
                     signal, callType,
-                    callerName: userData.name,
+                    callerName: userDataRef.current?.name, // ✅ was userData.name
                     chatId,
                 });
             });
