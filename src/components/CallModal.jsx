@@ -109,24 +109,34 @@ const CallModal = () => {
     setCamOff(!next);
   };
 
-  const sendCallMessage = async () => {
+const sendCallMessage = async () => {
     if (!msgInput.trim()) return;
     try {
-      await axios.post(backendUrl + "/api/message/", {
+      const response = await axios.post(backendUrl + "/api/message/", {
         content: msgInput,
         chatId: callState.chatId,
       });
+
+      if (response.data.success) {
+        const newMessage = response.data.message;
+
+        // ✅ Emit via socket so the other person receives it live
+        import("../App.jsx").then(({ globalSocket }) => {
+          globalSocket.emit("new message", newMessage);
+        });
+
+        setCallMessages((prev) => [
+          ...prev,
+          {
+            sender: userData.name,
+            content: msgInput,
+            time: new Date().toLocaleTimeString(),
+          },
+        ]);
+      }
     } catch (e) {
       console.log(e);
     }
-    setCallMessages((prev) => [
-      ...prev,
-      {
-        sender: userData.name,
-        content: msgInput,
-        time: new Date().toLocaleTimeString(),
-      },
-    ]);
     setMsgInput("");
   };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import { useContext, useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useSelector } from "react-redux";
@@ -28,7 +28,9 @@ const ChatArea = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [isGroupChat, setIsGroupChat] = useState(false);
   const [otherUserId, setOtherUserId] = useState(null);
+  const [mediaPreview, setMediaPreview] = useState(null); // { file, url, type }
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // ── Fetch messages ──
   const fetchMessages = async () => {
@@ -39,12 +41,10 @@ const ChatArea = () => {
         setLoaded(true);
         socket.emit("join chat", chat_id);
       }
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (error) { console.log(error); }
   };
 
-  // ── Check if group chat + get other user ID ──
+  // ── Fetch chat info ──
   const fetchChatInfo = async () => {
     try {
       const response = await axios.get(backendUrl + "/api/chat/");
@@ -60,76 +60,84 @@ const ChatArea = () => {
           }
         }
       }
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (error) { console.log(error); }
   };
 
   // ── Leave group ──
   const leaveGroup = async () => {
     try {
       const response = await axios.put(backendUrl + "/api/chat/groupExit", {
-        chatId: chat_id,
-        userId: userData?._id,
+        chatId: chat_id, userId: userData?._id,
       });
       if (response.data.success) {
         toast.success("Left the group");
         setRefresh(!refresh);
         navigate("/app/welcome");
-      } else {
-        toast.error(response.data.message);
-      }
-    } catch (error) {
-      console.log(error);
-      toast.error(error.message);
-    }
+      } else { toast.error(response.data.message); }
+    } catch (error) { toast.error(error.message); }
   };
 
-  // ── Send message ──
+  // ── Send message (text or media) ──
   const sendMessage = async () => {
-    if (!messageContent.trim()) return;
+    if (!messageContent.trim() && !mediaPreview) return;
     try {
-      const response = await axios.post(backendUrl + "/api/message/", {
-        content: messageContent,
-        chatId: chat_id,
-      });
+      let response;
+      if (mediaPreview) {
+        // Send as multipart/form-data
+        const formData = new FormData();
+        formData.append("chatId", chat_id);
+        if (messageContent.trim()) formData.append("content", messageContent);
+        formData.append("media", mediaPreview.file);
+        response = await axios.post(backendUrl + "/api/message/", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        response = await axios.post(backendUrl + "/api/message/", {
+          content: messageContent, chatId: chat_id,
+        });
+      }
+
       if (response.data.success) {
         const newMessage = response.data.message;
         socket.emit("new message", newMessage);
         setAllMessages((prev) => [...prev, newMessage]);
         setMessageContent("");
+        setMediaPreview(null);
         setRefresh((prev) => !prev);
       }
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (error) { console.log(error); }
   };
 
-  // ── Handle voice call ──
+  // ── Handle file pick ──
+  const handleFilePick = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const isVideo = file.type.startsWith("video");
+    const isImage = file.type.startsWith("image");
+    if (!isVideo && !isImage) { toast.error("Only images and videos allowed"); return; }
+    if (file.size > 50 * 1024 * 1024) { toast.error("File must be under 50MB"); return; }
+    setMediaPreview({ file, url: URL.createObjectURL(file), type: isVideo ? "video" : "image" });
+    e.target.value = ""; // reset input
+  };
+
+  // ── Voice/video call ──
   const handleVoiceCall = () => {
     if (!otherUserId) return;
     globalSocket.emit("get-socket-id", otherUserId, (socketId) => {
-      if (!socketId) {
-        toast.error("User is offline");
-        return;
-      }
+      if (!socketId) { toast.error("User is offline"); return; }
       startCall(socketId, chat_user, "voice", chat_id);
     });
   };
 
-  // ── Handle video call ──
   const handleVideoCall = () => {
     if (!otherUserId) return;
     globalSocket.emit("get-socket-id", otherUserId, (socketId) => {
-      if (!socketId) {
-        toast.error("User is offline");
-        return;
-      }
+      if (!socketId) { toast.error("User is offline"); return; }
       startCall(socketId, chat_user, "video", chat_id);
     });
   };
 
-  // ── Setup socket ──
+  // ── Socket setup ──
   useEffect(() => {
     socket = globalSocket;
     socket.emit("setup", userData);
@@ -143,6 +151,12 @@ const ChatArea = () => {
     };
   }, []);
 
+  // ── Reset typing on chat change ──
+  useEffect(() => {
+    setIsTyping(false);
+    setTyping(false);
+  }, [chat_id]);
+
   // ── Listen for new messages ──
   useEffect(() => {
     if (!socket) return;
@@ -154,14 +168,13 @@ const ChatArea = () => {
         setRefresh((prev) => !prev);
       }
     });
-    return () => {
-      socket.off("message received");
-    };
+    return () => { socket.off("message received"); };
   }, [chat_id]);
 
   // ── Fetch on chat change ──
   useEffect(() => {
     setLoaded(false);
+    setMediaPreview(null);
     fetchMessages();
     fetchChatInfo();
   }, [chat_id]);
@@ -175,39 +188,19 @@ const ChatArea = () => {
   const handleTyping = (e) => {
     setMessageContent(e.target.value);
     if (!socketConnected) return;
-    if (!typing) {
-      setTyping(true);
-      socket.emit("typing", chat_id);
-    }
+    if (!typing) { setTyping(true); socket.emit("typing", chat_id); }
     const lastTypingTime = new Date().getTime();
     setTimeout(() => {
-      const timeNow = new Date().getTime();
-      if (timeNow - lastTypingTime >= 2000 && typing) {
+      if (new Date().getTime() - lastTypingTime >= 2000 && typing) {
         socket.emit("stop typing", chat_id);
         setTyping(false);
       }
     }, 2000);
   };
 
-  if (!userData) {
+  if (!userData || !loaded) {
     return (
-      <div
-        className={`chatArea-container${lightTheme ? "" : " dark"}`}
-        style={{ gap: 16, padding: 20 }}
-      >
-        <div className="skeleton" style={{ height: 60, width: "100%" }} />
-        <div className="skeleton" style={{ flex: 1, width: "100%" }} />
-        <div className="skeleton" style={{ height: 56, width: "100%" }} />
-      </div>
-    );
-  }
-
-  if (!loaded) {
-    return (
-      <div
-        className={`chatArea-container${lightTheme ? "" : " dark"}`}
-        style={{ gap: 16, padding: 20 }}
-      >
+      <div className={`chatArea-container${lightTheme ? "" : " dark"}`} style={{ gap: 16, padding: 20 }}>
         <div className="skeleton" style={{ height: 60, width: "100%" }} />
         <div className="skeleton" style={{ flex: 1, width: "100%" }} />
         <div className="skeleton" style={{ height: 56, width: "100%" }} />
@@ -220,43 +213,27 @@ const ChatArea = () => {
 
       {/* ── Header ── */}
       <div className={`chatArea-header${lightTheme ? "" : " dark"}`}>
-        <div
-          className="convo-avatar"
-          style={{
-            width: 38, height: 38, fontSize: "0.9rem",
-            background: isGroupChat ? "#6c63ff" : "var(--accent)",
-          }}
-        >
+        <div className="convo-avatar" style={{
+          width: 38, height: 38, fontSize: "0.9rem",
+          background: isGroupChat ? "#6c63ff" : "var(--accent)",
+        }}>
           {chat_user[0].toUpperCase()}
         </div>
         <div style={{ flex: 1 }}>
-          <p className={`chat-header-name${lightTheme ? "" : " dark"}`}>
-            {chat_user}
-          </p>
+          <p className={`chat-header-name${lightTheme ? "" : " dark"}`}>{chat_user}</p>
           {isTyping && (
-            <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginTop: 2 }}>
-              typing...
-            </p>
+            <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginTop: 2 }}>typing...</p>
           )}
         </div>
 
-        {/* ── Call Buttons — only for direct chats ── */}
         {!isGroupChat && (
           <div style={{ display: "flex", gap: 8, marginRight: 12 }}>
-            <button
-              onClick={handleVoiceCall}
-              title="Voice Call"
-              style={callBtnStyle(lightTheme)}
-            >
+            <button onClick={handleVoiceCall} title="Voice Call" style={callBtnStyle(lightTheme)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </button>
-            <button
-              onClick={handleVideoCall}
-              title="Video Call"
-              style={callBtnStyle(lightTheme)}
-            >
+            <button onClick={handleVideoCall} title="Video Call" style={callBtnStyle(lightTheme)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="23 7 16 12 23 17 23 7" />
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
@@ -265,28 +242,14 @@ const ChatArea = () => {
           </div>
         )}
 
-        {/* Leave Group button — only for group chats */}
         {isGroupChat && (
-          <button
-            onClick={leaveGroup}
-            title="Leave Group"
-            style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "6px 12px", border: "1.5px solid #ff4d4f",
-              borderRadius: "8px", background: "transparent",
-              color: "#ff4d4f", fontSize: "0.8rem", fontWeight: 500,
-              fontFamily: "DM Sans, sans-serif", cursor: "pointer",
-              transition: "background 0.15s, color 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#ff4d4f";
-              e.currentTarget.style.color = "white";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#ff4d4f";
-            }}
-          >
+          <button onClick={leaveGroup} title="Leave Group" style={{
+            display: "flex", alignItems: "center", gap: "6px",
+            padding: "6px 12px", border: "1.5px solid #ff4d4f",
+            borderRadius: "8px", background: "transparent",
+            color: "#ff4d4f", fontSize: "0.8rem", fontWeight: 500,
+            fontFamily: "DM Sans, sans-serif", cursor: "pointer",
+          }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
@@ -302,30 +265,70 @@ const ChatArea = () => {
         {allMessages.map((message, index) => {
           if (!message?.sender?._id) return null;
           if (message.sender._id.toString() === userData._id.toString()) {
-            return <MessageSelf key={message._id || index} message={message} />;
+            return <MessageSelf key={message._id || index} message={message} backendUrl={backendUrl} />;
           } else {
-            return (
-              <MessageOthers
-                key={message._id || index}
-                message={message}
-                lightTheme={lightTheme}
-              />
-            );
+            return <MessageOthers key={message._id || index} message={message} lightTheme={lightTheme} backendUrl={backendUrl} />;
           }
         })}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* ── Media preview strip ── */}
+      {mediaPreview && (
+        <div style={{
+          padding: "8px 20px", background: lightTheme ? "var(--light-surface)" : "var(--dark-surface)",
+          borderTop: `1px solid ${lightTheme ? "var(--light-border)" : "var(--dark-border)"}`,
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          {mediaPreview.type === "image" ? (
+            <img src={mediaPreview.url} alt="preview" style={{ height: 60, borderRadius: 8, objectFit: "cover" }} />
+          ) : (
+            <video src={mediaPreview.url} style={{ height: 60, borderRadius: 8 }} />
+          )}
+          <span style={{ fontSize: "0.8rem", color: lightTheme ? "var(--light-muted)" : "var(--dark-muted)", flex: 1 }}>
+            {mediaPreview.file.name}
+          </span>
+          <button onClick={() => setMediaPreview(null)} style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            color: "#ff4d4f", fontSize: "1.1rem", fontWeight: 700,
+          }}>✕</button>
+        </div>
+      )}
+
       {/* ── Input ── */}
       <div className={`text-input-area${lightTheme ? "" : " dark"}`}>
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          style={{ display: "none" }}
+          onChange={handleFilePick}
+        />
+        {/* Attach button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          title="Send photo/video"
+          style={{
+            width: 38, height: 38, borderRadius: "50%", border: "none",
+            background: lightTheme ? "var(--light-bg)" : "var(--dark-card)",
+            color: lightTheme ? "var(--light-muted)" : "var(--dark-muted)",
+            cursor: "pointer", display: "flex", alignItems: "center",
+            justifyContent: "center", flexShrink: 0,
+            transition: "background 0.15s",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 17.2a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
+        </button>
+
         <input
           className={`msg-input${lightTheme ? "" : " dark"}`}
-          placeholder="Type a message..."
+          placeholder={mediaPreview ? "Add a caption..." : "Type a message..."}
           value={messageContent}
           onChange={handleTyping}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") sendMessage();
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
         />
         <button className="send-btn" onClick={sendMessage}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
