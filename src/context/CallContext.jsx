@@ -60,8 +60,14 @@ const CallContextProvider = ({ children, socket }) => {
     const remoteVideoRef = useRef(null);
     const screenTrackRef = useRef(null);
     const localStreamRef = useRef(null);
+    const callStateRef = useRef(callState); // ✅ always up-to-date callState
 
-    // Keep refs in sync
+    // Keep callStateRef always in sync
+    useEffect(() => {
+        callStateRef.current = callState;
+    }, [callState]);
+
+    // Keep localStreamRef in sync
     useEffect(() => {
         localStreamRef.current = localStream;
     }, [localStream]);
@@ -102,19 +108,18 @@ const CallContextProvider = ({ children, socket }) => {
 
         // ✅ Show other person's messages in the in-call chat panel
         socket.on("message received", (newMessage) => {
-            setCallState((prev) => {
-                if (!prev.active || !prev.accepted) return prev;
-                if (newMessage?.chat?._id !== prev.chatId) return prev;
-                setCallMessages((msgs) => [
-                    ...msgs,
-                    {
-                        sender: newMessage.sender?.name || "Unknown",
-                        content: newMessage.content,
-                        time: new Date().toLocaleTimeString(),
-                    },
-                ]);
-                return prev;
-            });
+            const cs = callStateRef.current;
+            if (!cs.active || !cs.accepted) return;
+            if (!newMessage?.chat?._id) return;
+            if (newMessage.chat._id !== cs.chatId) return;
+            setCallMessages((msgs) => [
+                ...msgs,
+                {
+                    sender: newMessage.sender?.name || "Unknown",
+                    content: newMessage.content,
+                    time: new Date().toLocaleTimeString(),
+                },
+            ]);
         });
 
         return () => {
