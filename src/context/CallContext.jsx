@@ -60,7 +60,7 @@ const CallContextProvider = ({ children, socket }) => {
     const remoteVideoRef = useRef(null);
     const screenTrackRef = useRef(null);
     const localStreamRef = useRef(null);
-    const callStateRef = useRef(callState); // ✅ always up-to-date callState
+    const callStateRef = useRef(callState);
 
     // Keep callStateRef always in sync
     useEffect(() => {
@@ -106,12 +106,16 @@ const CallContextProvider = ({ children, socket }) => {
 
         socket.on("call:ended", () => endCall(false));
 
-        // ✅ Show other person's messages in the in-call chat panel
+        // ✅ Only add messages from the OTHER person (not our own sent messages)
         socket.on("message received", (newMessage) => {
             const cs = callStateRef.current;
             if (!cs.active || !cs.accepted) return;
             if (!newMessage?.chat?._id) return;
             if (newMessage.chat._id !== cs.chatId) return;
+
+            // ✅ Skip if the sender is the current user (we already added it via sendCallMessage)
+            if (newMessage.sender?._id === userData._id) return;
+
             setCallMessages((msgs) => [
                 ...msgs,
                 {
@@ -129,6 +133,19 @@ const CallContextProvider = ({ children, socket }) => {
             socket.off("message received");
         };
     }, [socket]);
+
+    // ✅ NEW: Call this from your chat input component when the current user sends a message
+    const sendCallMessage = (content) => {
+        setCallMessages((msgs) => [
+            ...msgs,
+            {
+                sender: userData.name,
+                content,
+                time: new Date().toLocaleTimeString(),
+                isSelf: true, // optional: useful for styling your own messages differently
+            },
+        ]);
+    };
 
     const startCall = async (receiverSocketId, receiverName, callType, chatId) => {
         try {
@@ -291,6 +308,7 @@ const CallContextProvider = ({ children, socket }) => {
             toggleScreenShare, screenSharing,
             toggleCamTrack,
             callMessages, setCallMessages,
+            sendCallMessage, // ✅ expose so the chat input component can call it
         }}>
             {children}
         </CallContext.Provider>

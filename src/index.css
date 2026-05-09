@@ -811,11 +811,20 @@ textarea:focus, input:focus { outline: none; }
     background: var(--light-surface);
     gap: 16px;
     position: relative;
+    text-align: center;     /* ✅ centers "Welcome back" and "Sign in to continue" */
+    align-items: center;    /* ✅ centers flex children */
   }
 
   .login-form-area.dark {
     background: var(--dark-surface);
     box-shadow: var(--shadow-dark);
+  }
+
+  /* ✅ Keep inputs and button full width after align-items: center */
+  .login-form-area input,
+  .login-form-area button[type="submit"] {
+    width: 100%;
+    text-align: left;
   }
 
   /* LiveChat logo above the heading on mobile */
@@ -876,7 +885,7 @@ textarea:focus, input:focus { outline: none; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 20px;           /* tighter gap so icons + logout all fit */
+    gap: 20px;
     width: 100%;
     padding: 8px 0;
   }
