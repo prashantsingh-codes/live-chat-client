@@ -15,9 +15,9 @@ const CallModal = () => {
     acceptCall,
     rejectCall,
     endCall,
-    toggleScreenShare,
+    // toggleScreenShare,  // ── SCREEN SHARE: commented out
     toggleCamTrack,
-    screenSharing,
+    // screenSharing,      // ── SCREEN SHARE: commented out
     callMessages,
     setCallMessages,
   } = useContext(CallContext);
@@ -36,7 +36,8 @@ const CallModal = () => {
     if (pipRef.current && localStream) {
       pipRef.current.srcObject = localStream;
     }
-  }, [localStream, callState.accepted, screenSharing, camOff]);
+  }, [localStream, callState.accepted, camOff]);
+  // }, [localStream, callState.accepted, screenSharing, camOff]); // ── SCREEN SHARE: original dep array
 
   if (!callState.active) return null;
 
@@ -104,12 +105,12 @@ const CallModal = () => {
   };
 
   const toggleCam = () => {
-    const next = camOff; // if camOff=true, we want to enable → next=true
+    const next = camOff;
     toggleCamTrack(next);
     setCamOff(!next);
   };
 
-const sendCallMessage = async () => {
+  const sendCallMessage = async () => {
     if (!msgInput.trim()) return;
     try {
       const response = await axios.post(backendUrl + "/api/message/", {
@@ -151,7 +152,8 @@ const sendCallMessage = async () => {
             playsInline
             style={{
               ...styles.remoteVideo,
-              objectFit: screenSharing ? "contain" : "cover",
+              objectFit: "cover",
+              // objectFit: screenSharing ? "contain" : "cover", // ── SCREEN SHARE: original
             }}
           />
         ) : (
@@ -179,13 +181,13 @@ const sendCallMessage = async () => {
           <div style={styles.callerTag}>
             <div style={styles.callerTagDot} />
             {callState.callerName}
+            {/* ── SCREEN SHARE: presenting badge commented out
             {screenSharing && (
-              <span
-                style={{ marginLeft: 6, fontSize: "0.75rem", color: "#a78bfa" }}
-              >
+              <span style={{ marginLeft: 6, fontSize: "0.75rem", color: "#a78bfa" }}>
                 • presenting
               </span>
             )}
+            */}
           </div>
         )}
 
@@ -194,7 +196,8 @@ const sendCallMessage = async () => {
           <div
             style={{
               ...styles.pipWrapper,
-              bottom: screenSharing ? "calc(40% + 16px)" : 100,
+              bottom: 100,
+              // bottom: screenSharing ? "calc(40% + 16px)" : 100, // ── SCREEN SHARE: original
             }}
           >
             {camOff ? (
@@ -219,7 +222,7 @@ const sendCallMessage = async () => {
           </div>
         )}
 
-        {/* Screen share: local cam in lower strip */}
+        {/* ── SCREEN SHARE: local cam strip commented out
         {screenSharing && callState.callType === "video" && (
           <div style={styles.screenShareLocalArea}>
             <video
@@ -232,6 +235,7 @@ const sendCallMessage = async () => {
             <span style={styles.youLabel}>You</span>
           </div>
         )}
+        */}
 
         {/* Controls */}
         <div style={styles.controlsBar}>
@@ -247,7 +251,7 @@ const sendCallMessage = async () => {
                 active={camOff}
                 onClick={toggleCam}
               />
-              {/* Hide screen share on mobile — not supported */}
+              {/* ── SCREEN SHARE: screen share button commented out
               {!isMobile && (
                 <RoundBtn
                   icon="🖥️"
@@ -255,6 +259,7 @@ const sendCallMessage = async () => {
                   onClick={toggleScreenShare}
                 />
               )}
+              */}
             </>
           )}
           <RoundBtn
@@ -438,34 +443,35 @@ const styles = {
     justifyContent: "center",
     gap: 6,
   },
-  screenShareLocalArea: {
-    position: "absolute",
-    bottom: 90,
-    left: 0,
-    right: 0,
-    height: "35%",
-    background: "#000",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  screenShareLocalVideo: {
-    height: "100%",
-    maxWidth: "60%",
-    objectFit: "cover",
-    borderRadius: 12,
-  },
-  youLabel: {
-    position: "absolute",
-    bottom: 8,
-    left: "50%",
-    transform: "translateX(-50%)",
-    color: "#fff",
-    fontSize: "0.75rem",
-    background: "rgba(0,0,0,0.5)",
-    padding: "2px 10px",
-    borderRadius: 10,
-  },
+  // ── SCREEN SHARE: styles kept but unused, uncomment when re-enabling
+  // screenShareLocalArea: {
+  //   position: "absolute",
+  //   bottom: 90,
+  //   left: 0,
+  //   right: 0,
+  //   height: "35%",
+  //   background: "#000",
+  //   display: "flex",
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  // },
+  // screenShareLocalVideo: {
+  //   height: "100%",
+  //   maxWidth: "60%",
+  //   objectFit: "cover",
+  //   borderRadius: 12,
+  // },
+  // youLabel: {
+  //   position: "absolute",
+  //   bottom: 8,
+  //   left: "50%",
+  //   transform: "translateX(-50%)",
+  //   color: "#fff",
+  //   fontSize: "0.75rem",
+  //   background: "rgba(0,0,0,0.5)",
+  //   padding: "2px 10px",
+  //   borderRadius: 10,
+  // },
   controlsBar: {
     position: "absolute",
     bottom: 0,
